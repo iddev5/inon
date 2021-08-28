@@ -129,4 +129,45 @@ pub const Data = struct {
             },
         }
     }
+    
+    pub fn serialize(self: *Self, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
+        if (!std.mem.eql(u8, self.name, "")) {
+            _ = try writer.writeByteNTimes(' ', indent);
+            try writer.print("{s} = ", .{self.name});
+        }
+            
+        switch (self.value) {
+            .num => try writer.print("{}", .{self.value.num}),
+            .str => try writer.print("\"{s}\"", .{self.value.str.items}),
+            .arr => {
+                const arr = self.value.arr;
+                var id: usize = 0;
+
+                _ = try writer.write("[");
+
+                while (id < arr.items.len) : (id += 1) {
+                    try arr.items[id].serialize(indent, writer);
+                    if (id != arr.items.len - 1)
+                        _ = try writer.write(", ");
+                }
+
+                _ = try writer.write("]");
+            },
+            .map => {
+                const map = self.value.map;
+                var iter = map.iterator();
+                var id: usize = 0;
+
+                _ = try writer.write("{\n");
+
+                while (iter.next()) |entry| : (id += 1) {
+                    try entry.value_ptr.*.serialize(indent + 4, writer);
+                    _ = try writer.write(";\n");
+                }
+
+                _ = try writer.writeByteNTimes(' ', indent);
+                _ = try writer.write("}");
+            },
+        }
+    }
 };

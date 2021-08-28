@@ -34,4 +34,8 @@ pub fn main() anyerror!void {
 
     const stdio = std.io.getStdOut().writer();
     try inon.parser.global.printValue(stdio);
+    
+    try writer.print("\n\n==================\n\n", .{});
+    
+    try inon.parser.global.serialize(0, stdio);
 }
