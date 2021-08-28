@@ -2,19 +2,37 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const parse = @import("parser.zig");
 pub const Parser = parse.Parser;
+const Data = @import("data.zig").Data;
 
 pub const Inon = struct {
-    parser: Parser,
+    allocator: *Allocator,
+    parser: Parser = undefined,
 
     const Self = @This();
 
-    pub fn init(src: []const u8, allocator: *Allocator, writer: *std.fs.File.Writer) Self {
+    pub fn init(allocator: *Allocator) Self {
         return .{
-            .parser = Parser.init(src, allocator, writer),
+            .allocator = allocator,
         };
     }
 
+    pub fn deserialize(self: *Self, reader: std.fs.File.Reader) !Data {
+        const src = reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
+        return self.deserializeFromMemory(src);
+    }
+
+    pub fn deserializeFromMemory(self: *Self, src: []const u8) !Data {
+        self.parser = Parser.init(src, self.allocator);
+        defer self.parser.free();
+        try self.parser.parse();
+        return self.parser.global;
+    }
+
+    pub fn serialize(self: *Self, writer: std.fs.File.Writer) !void {
+        try self.parser.global.serialize(0, writer);
+    }
+
     pub fn free(self: *Self) void {
-        self.parser.free();
+        _ = self;
     }
 };

@@ -52,7 +52,7 @@ pub const Data = struct {
     pub fn printValue(self: *Self, writer: std.fs.File.Writer) !void {
         switch (self.value) {
             .num => try writer.print("{}", .{self.value.num}),
-            .str => try writer.print("{s}", .{self.value.str.items}),
+            .str => try writer.print("\"{s}\"", .{self.value.str.items}),
             .arr => {
                 const arr = self.value.arr;
                 var id: usize = 0;
@@ -129,13 +129,13 @@ pub const Data = struct {
             },
         }
     }
-    
+
     pub fn serialize(self: *Self, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
         if (!std.mem.eql(u8, self.name, "")) {
             _ = try writer.writeByteNTimes(' ', indent);
             try writer.print("{s} = ", .{self.name});
         }
-            
+
         switch (self.value) {
             .num => try writer.print("{}", .{self.value.num}),
             .str => try writer.print("\"{s}\"", .{self.value.str.items}),

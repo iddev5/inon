@@ -1,6 +1,5 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const FileWriter = std.fs.File.Writer;
 const lex = @import("lexer.zig");
 const Lexer = lex.Lexer;
 const Token = lex.Token;
@@ -12,7 +11,6 @@ pub const Parser = struct {
     token: Token,
     global: Data,
     allocator: *Allocator,
-    writer: *FileWriter,
     error_context: ?ErrorContext = null,
 
     const Self = @This();
@@ -29,19 +27,17 @@ pub const Parser = struct {
 
     pub const Error = Allocator.Error || std.fmt.ParseFloatError || ParseError;
 
-    pub fn init(src: []const u8, allocator: *Allocator, writer: *FileWriter) Self {
+    pub fn init(src: []const u8, allocator: *Allocator) Self {
         return .{
             .lexer = Lexer.init(src),
             .global = Data.initMap("global", allocator),
             .token = undefined,
             .allocator = allocator,
-            .writer = writer,
         };
     }
 
     pub fn free(self: *Self) void {
         self.lexer.free();
-        self.global.free();
     }
 
     fn parseAtom(self: *Self, source: *Data) Error!Data {
