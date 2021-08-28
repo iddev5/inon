@@ -61,8 +61,10 @@ pub const Parser = struct {
                 var arr = Data.initArray("", self.allocator);
                 while (self.token.toktype != .rsqr) {
                     try arr.value.arr.append(try self.parseExpr(source));
-                    if (self.token.toktype != .comma)
+                    if (self.token.toktype != .comma) {
+                        _ = self.advance();
                         return arr;
+                    }
                     _ = self.advance();
                 }
                 return arr;
