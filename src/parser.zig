@@ -42,18 +42,20 @@ pub const Parser = struct {
 
     fn parseAtom(self: *Self, source: *Data) Error!Data {
         const token = self.token;
-        _ = self.advance();
         switch (token.toktype) {
             .number => {
+                _ = self.advance();
                 const num = try std.fmt.parseFloat(f64, token.content);
                 return Data{ .name = "", .value = .{ .num = num } };
             },
             .string => {
+                _ = self.advance();
                 var str = Data.initString("", self.allocator);
                 try str.value.str.appendSlice(token.content);
                 return str;
             },
             .lsqr => {
+                _ = self.advance();
                 var arr = Data.initArray("", self.allocator);
                 while (self.token.toktype != .rsqr) {
                     try arr.value.arr.append(try self.parseExpr(source));
@@ -66,11 +68,13 @@ pub const Parser = struct {
                 return arr;
             },
             .lbra => {
+                _ = self.advance();
                 var obj = try self.parseObject(source);
                 _ = self.advance();
                 return obj;
             },
             .identifier => {
+                _ = self.advance();
                 var val = blk: {
                     if (std.mem.eql(u8, token.content, "global")) {
                         break :blk self.global;
@@ -98,7 +102,6 @@ pub const Parser = struct {
                 return val;
             },
             else => {
-                // FIXME: Paren expressions are broken
                 return try self.parseParenExpr(source);
             },
         }
@@ -244,6 +247,7 @@ pub const Parser = struct {
         var res = try self.parseExpr(source);
         if (self.token.toktype != .rpar)
             return ParseError.invalid_operator;
+        _ = self.advance();
         return res;
     }
 
