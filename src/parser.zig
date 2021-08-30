@@ -67,6 +67,7 @@ pub const Parser = struct {
             },
             .lbra => {
                 var obj = try self.parseObject(source);
+                _ = self.advance();
                 return obj;
             },
             .identifier => {
