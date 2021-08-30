@@ -189,6 +189,15 @@ pub const Parser = struct {
                             },
                             else => return self.setErrorContext(ParseError.invalid_operator),
                         }
+                    } else if (rhs.value == .num) {
+                        switch (oper) {
+                            .dot => {
+                                const item = lhs.value.arr.items[@floatToInt(u32, rhs.value.num)];
+                                lhs.value.arr.shrinkAndFree(0);
+                                try lhs.value.arr.append(item);
+                            },
+                            else => return self.setErrorContext(ParseError.invalid_operator),
+                        }
                     } else return self.setErrorContext(ParseError.mismatched_operands);
                 },
                 .map => {
