@@ -98,6 +98,7 @@ pub const Parser = struct {
                 return val;
             },
             else => {
+                // FIXME: Paren expressions are broken
                 return try self.parseParenExpr(source);
             },
         }
@@ -204,8 +205,8 @@ pub const Parser = struct {
                         switch (oper) {
                             .dot => {
                                 const item = lhs.value.arr.items[@floatToInt(u32, rhs.value.num)];
-                                lhs.value.arr.shrinkAndFree(0);
-                                try lhs.value.arr.append(item);
+                                lhs.free();
+                                lhs = try item.makeCopy(self.allocator);
                             },
                             else => return self.setErrorContext(ParseError.invalid_operator),
                         }
