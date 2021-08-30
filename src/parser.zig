@@ -107,6 +107,33 @@ pub const Parser = struct {
         }
     }
 
+    // Supported operations:
+    //    [-] num -> num
+    //    [!] bool -> bool
+    fn unOp(self: *Self, source: *Data) Error!Data {
+        const token = self.token;
+
+        if (token.toktype == .minus) {
+            _ = self.advance();
+            var val = try self.unOp(source);
+            switch (val.value) {
+                .num => val.value.num = -val.value.num,
+                else => return self.setErrorContext(ParseError.mismatched_operands),
+            }
+            return val;
+        } else if (token.toktype == .bang) {
+            _ = self.advance();
+            var val = try self.unOp(source);
+            switch (val.value) {
+                .boo => val.value.boo = !val.value.boo,
+                else => return self.setErrorContext(ParseError.mismatched_operands),
+            }
+            return val;
+        }
+
+        return try self.parseAtom(source);
+    }
+
     inline fn binOpPrec(self: *Self) isize {
         return switch (self.token.toktype) {
             .greater, .less, .greateql, .lesseql => 10,
@@ -119,9 +146,13 @@ pub const Parser = struct {
 
     // Supported operations:
     //    num [+][-][*][/][//][%] num -> num
+    //    num [>][<][>=][<=] num -> bool
     //    str [++] str -> str
     //    str [**] num -> str
+    //    str [.] num -> str
     //    arr [++] arr -> arr
+    //    arr [.] num -> Data
+    //    map [.] str -> Data
     fn binOp(self: *Self, prec: isize, lhsx: Data, source: *Data) Error!Data {
         var lhs = lhsx;
         var rhs: Data = undefined;
@@ -236,7 +267,7 @@ pub const Parser = struct {
     }
 
     fn parseExpr(self: *Self, source: *Data) Error!Data {
-        const lhs = try self.parseAtom(source);
+        const lhs = try self.unOp(source);
         return try self.binOp(0, lhs, source);
     }
 
