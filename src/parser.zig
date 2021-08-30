@@ -54,6 +54,10 @@ pub const Parser = struct {
                 try str.value.str.appendSlice(token.content);
                 return str;
             },
+            .tru, .fals => {
+                _ = self.advance();
+                return Data{ .name = "", .value = .{ .boo = if (token.toktype == .tru) true else false } };
+            },
             .lsqr => {
                 _ = self.advance();
                 var arr = Data.initArray("", self.allocator);

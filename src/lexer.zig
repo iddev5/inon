@@ -4,6 +4,8 @@ pub const TokenType = enum {
     string,
     identifier,
     number,
+    tru,
+    fals,
 
     assignment,
     equality,
@@ -120,7 +122,14 @@ pub const Lexer = struct {
             '\"' => self.string(),
             else => {
                 if (std.ascii.isDigit(c)) return self.number();
-                if (std.ascii.isAlpha(c) or c == '_') return self.identifier();
+                if (std.ascii.isAlpha(c) or c == '_') {
+                    const ident = self.identifier();
+                    if (std.mem.eql(u8, ident.content, "true")) {
+                        return self.makeToken(.tru, 0);
+                    } else if (std.mem.eql(u8, ident.content, "false")) {
+                        return self.makeToken(.fals, 0);
+                    } else return ident;
+                }
                 return self.makeToken(.eof, 0);
             },
         };
