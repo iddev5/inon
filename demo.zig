@@ -12,16 +12,15 @@ pub fn main() anyerror!void {
     defer inon.free();
 
     var data = inon.deserializeFromMemory(
-        \\no = 12345;
-        \\hi = "hello" ++ " world!";
-        \\test = [10, 20, "test"];
-        \\map = {
-        \\ x = 20;
-        \\ y = "inon " ++ global.hi;
-        \\ z = {
-        \\  x = [10, 123, "hello"];
-        \\ };
+        \\first_name = "joe";
+        \\last_name = "something";
+        \\age = 30;
+        \\address = {
+        \\    street_no = 420;
+        \\    city = "nyc";
         \\};
+        \\phone_nos = [100, 200, 300];
+        \\second_no = phone_nos.1;
     ) catch |err| {
         if (inon.parser.getErrorContext()) |error_context| {
             switch (error_context.err) {
