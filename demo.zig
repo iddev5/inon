@@ -34,8 +34,7 @@ pub fn main() anyerror!void {
     defer data.free();
 
     try stdio.print("Deserialized: \n\n", .{});
-    try data.printValue(stdio);
-    try stdio.print("\n\n", .{});
+    try stdio.print("{s}\n\n", .{@TypeOf(data.value.map)});
 
     try stdio.print("Serialized: \n\n", .{});
     try inon.serialize(stdio);

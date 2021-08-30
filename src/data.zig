@@ -50,52 +50,13 @@ pub const Data = struct {
         }
     }
 
-    pub fn printValue(self: *Self, writer: std.fs.File.Writer) !void {
-        switch (self.value) {
-            .boo => try writer.print("{}", .{self.value.boo}),
-            .num => try writer.print("{}", .{self.value.num}),
-            .str => try writer.print("\"{s}\"", .{self.value.str.items}),
-            .arr => {
-                const arr = self.value.arr;
-                var id: usize = 0;
-
-                _ = try writer.write("[");
-
-                while (id < arr.items.len) : (id += 1) {
-                    arr.items[id].printValue(writer) catch unreachable;
-                    if (id != arr.items.len - 1)
-                        _ = try writer.write(", ");
-                }
-
-                _ = try writer.write("]");
-            },
-            .map => {
-                const map = self.value.map;
-                var iter = map.iterator();
-                var id: usize = 0;
-
-                _ = try writer.write("{");
-
-                while (iter.next()) |entry| : (id += 1) {
-                    try writer.print("{s} : ", .{entry.key_ptr.*});
-                    entry.value_ptr.printValue(writer) catch unreachable;
-                    if (id != map.count() - 1) {
-                        _ = try writer.write(", ");
-                    }
-                }
-
-                _ = try writer.write("}");
-            },
-        }
-    }
-
     pub fn findData(self: *Self, name: []const u8) !Self {
         if (std.mem.eql(u8, self.name, name))
             return self.*;
 
         return switch (self.value) {
             .map => self.value.map.get(name).?,
-            else => unreachable, //error.DataNotFound,
+            else => unreachable,
         };
     }
 
