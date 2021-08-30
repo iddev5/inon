@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 
 pub const String = std.ArrayList(u8);
 
-pub const DataType = enum { num, str, arr, map };
+pub const DataType = enum { boo, num, str, arr, map };
 
 pub const ArrayType = std.ArrayList(Data);
 pub const MapType = std.StringHashMap(Data);
@@ -11,6 +11,7 @@ pub const MapType = std.StringHashMap(Data);
 pub const Data = struct {
     name: []const u8,
     value: union(DataType) {
+        boo: bool,
         num: f64,
         str: String,
         arr: std.ArrayList(Data),
@@ -51,6 +52,7 @@ pub const Data = struct {
 
     pub fn printValue(self: *Self, writer: std.fs.File.Writer) !void {
         switch (self.value) {
+            .boo => try writer.print("{}", .{self.value.boo}),
             .num => try writer.print("{}", .{self.value.num}),
             .str => try writer.print("\"{s}\"", .{self.value.str.items}),
             .arr => {
@@ -99,7 +101,7 @@ pub const Data = struct {
 
     pub fn makeCopy(self: *const Self, allocator: *Allocator) Allocator.Error!Self {
         switch (self.value) {
-            .num => return self.*,
+            .boo, .num => return self.*,
             .str => {
                 var data = Data.initString("", allocator);
                 for (self.value.str.items) |item| {
@@ -137,6 +139,7 @@ pub const Data = struct {
         }
 
         switch (self.value) {
+            .boo => try writer.print("{}", .{self.value.boo}),
             .num => try writer.print("{}", .{self.value.num}),
             .str => try writer.print("\"{s}\"", .{self.value.str.items}),
             .arr => {

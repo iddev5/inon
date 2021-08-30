@@ -15,6 +15,10 @@ pub const TokenType = enum {
     divide,
     floor,
     modulo,
+    greater,
+    less,
+    greateql,
+    lesseql,
 
     semicolon,
     lpar,
@@ -109,6 +113,8 @@ pub const Lexer = struct {
             ']' => self.makeToken(.rsqr, 0),
             ',' => self.makeToken(.comma, 0),
             '.' => self.makeToken(.dot, 0),
+            '>' => self.makeToken(if (self.matches('=')) .greateql else .greater, 0),
+            '<' => self.makeToken(if (self.matches('=')) .lesseql else .less, 0),
             '\"' => self.string(),
             else => {
                 if (std.ascii.isDigit(c)) return self.number();

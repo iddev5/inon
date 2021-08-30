@@ -105,6 +105,7 @@ pub const Parser = struct {
 
     inline fn binOpPrec(self: *Self) isize {
         return switch (self.token.toktype) {
+            .greater, .less, .greateql, .lesseql => 10,
             .plus, .concat, .minus => 12,
             .multiply, .repeat, .divide, .floor, .modulo => 13,
             .dot => 15,
@@ -140,18 +141,27 @@ pub const Parser = struct {
 
             switch (lhs.value) {
                 .num => {
-                    lhs.value.num = if (rhs.value == .num)
+                    if (rhs.value == .num) {
                         switch (oper) {
-                            .plus => lhs.value.num + rhs.value.num,
-                            .minus => lhs.value.num - rhs.value.num,
-                            .multiply => lhs.value.num * rhs.value.num,
-                            .divide => lhs.value.num / rhs.value.num,
-                            .floor => @divFloor(lhs.value.num, rhs.value.num),
-                            .modulo => @mod(lhs.value.num, rhs.value.num),
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            .plus => lhs.value.num = lhs.value.num + rhs.value.num,
+                            .minus => lhs.value.num = lhs.value.num - rhs.value.num,
+                            .multiply => lhs.value.num = lhs.value.num * rhs.value.num,
+                            .divide => lhs.value.num = lhs.value.num / rhs.value.num,
+                            .floor => lhs.value.num = @divFloor(lhs.value.num, rhs.value.num),
+                            .modulo => lhs.value.num = @mod(lhs.value.num, rhs.value.num),
+                            else => {
+                                var booldata = Data{ .name = "", .value = .{ .boo = false } };
+                                switch (oper) {
+                                    .greater => booldata.value.boo = lhs.value.num > rhs.value.num,
+                                    .less => booldata.value.boo = lhs.value.num < rhs.value.num,
+                                    .greateql => booldata.value.boo = lhs.value.num >= rhs.value.num,
+                                    .lesseql => booldata.value.boo = lhs.value.num <= rhs.value.num,
+                                    else => return self.setErrorContext(ParseError.invalid_operator),
+                                }
+                                lhs = booldata;
+                            },
                         }
-                    else
-                        return self.setErrorContext(ParseError.mismatched_operands);
+                    } else return self.setErrorContext(ParseError.mismatched_operands);
                 },
                 .str => {
                     if (rhs.value == .str) {
@@ -212,6 +222,7 @@ pub const Parser = struct {
                         }
                     } else return self.setErrorContext(ParseError.mismatched_operands);
                 },
+                else => unreachable,
             }
 
             rhs.free();
