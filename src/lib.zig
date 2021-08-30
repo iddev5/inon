@@ -29,7 +29,12 @@ pub const Inon = struct {
     }
 
     pub fn serialize(self: *Self, writer: std.fs.File.Writer) !void {
-        try self.parser.global.serialize(0, writer);
+        // Not the best serializer but ok
+        var iter = self.parser.global.value.map.iterator();
+        while (iter.next()) |entry| {
+            try entry.value_ptr.*.serialize(0, writer);
+            try writer.print(";\n", .{});
+        }
     }
 
     pub fn free(self: *Self) void {
