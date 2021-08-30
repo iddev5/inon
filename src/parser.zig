@@ -98,6 +98,7 @@ pub const Parser = struct {
                 return val;
             },
             else => {
+                _ = self.advance();
                 return try self.parseParenExpr(source);
             },
         }
