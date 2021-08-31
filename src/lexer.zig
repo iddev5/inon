@@ -75,6 +75,11 @@ pub const Lexer = struct {
                     self.line += 1;
                     self.pos += 1;
                 },
+                '#' => {
+                    while (self.peek() != '\n')
+                        self.pos += 1;
+                    self.line += 1;
+                },
                 ' ', '\r', '\t' => _ = self.next(),
                 else => return,
             }
