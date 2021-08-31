@@ -22,6 +22,8 @@ pub const TokenType = enum {
     greateql,
     lesseql,
     bang,
+    amp,
+    orop,
 
     semicolon,
     lpar,
@@ -33,6 +35,7 @@ pub const TokenType = enum {
     comma,
     dot,
 
+    unused,
     eof,
 };
 
@@ -124,6 +127,8 @@ pub const Lexer = struct {
             '!' => self.makeToken(.bang, 0),
             '>' => self.makeToken(if (self.matches('=')) .greateql else .greater, 0),
             '<' => self.makeToken(if (self.matches('=')) .lesseql else .less, 0),
+            '&' => self.makeToken(if (self.matches('&')) .amp else .unused, 0),
+            '|' => self.makeToken(if (self.matches('|')) .orop else .unused, 0),
             '\"' => self.string(),
             else => {
                 if (std.ascii.isDigit(c)) return self.number();

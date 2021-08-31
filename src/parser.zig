@@ -140,6 +140,7 @@ pub const Parser = struct {
 
     inline fn binOpPrec(self: *Self) isize {
         return switch (self.token.toktype) {
+            .amp, .orop => 9,
             .greater, .less, .greateql, .lesseql => 10,
             .plus, .concat, .minus => 12,
             .multiply, .repeat, .divide, .floor, .modulo => 13,
@@ -179,6 +180,15 @@ pub const Parser = struct {
             }
 
             switch (lhs.value) {
+                .boo => {
+                    if (rhs.value == .boo) {
+                        switch (oper) {
+                            .amp => lhs.value.boo = lhs.value.boo and rhs.value.boo,
+                            .orop => lhs.value.boo = lhs.value.boo or rhs.value.boo,
+                            else => return self.setErrorContext(ParseError.invalid_operator),
+                        }
+                    } else return self.setErrorContext(ParseError.mismatched_operands);
+                },
                 .num => {
                     if (rhs.value == .num) {
                         switch (oper) {
@@ -261,7 +271,6 @@ pub const Parser = struct {
                         }
                     } else return self.setErrorContext(ParseError.mismatched_operands);
                 },
-                else => unreachable,
             }
 
             rhs.free();
