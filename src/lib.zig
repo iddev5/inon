@@ -33,7 +33,6 @@ pub const Inon = struct {
         var iter = self.parser.global.value.map.iterator();
         while (iter.next()) |entry| {
             try entry.value_ptr.*.serialize(0, writer);
-            try writer.print(";\n", .{});
         }
     }
 

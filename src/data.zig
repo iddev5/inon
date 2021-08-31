@@ -94,6 +94,11 @@ pub const Data = struct {
     }
 
     pub fn serialize(self: *Self, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
+        try self.serializeInternal(indent, writer);
+        try writer.print(";\n", .{});
+    }
+    
+    fn serializeInternal(self: *Self, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
         if (!std.mem.eql(u8, self.name, "")) {
             _ = try writer.writeByteNTimes(' ', indent);
             try writer.print("{s} = ", .{self.name});
@@ -110,7 +115,7 @@ pub const Data = struct {
                 _ = try writer.write("[");
 
                 while (id < arr.items.len) : (id += 1) {
-                    try arr.items[id].serialize(indent, writer);
+                    try arr.items[id].serializeInternal(indent, writer);
                     if (id != arr.items.len - 1)
                         _ = try writer.write(", ");
                 }
@@ -125,7 +130,7 @@ pub const Data = struct {
                 _ = try writer.write("{\n");
 
                 while (iter.next()) |entry| : (id += 1) {
-                    try entry.value_ptr.*.serialize(indent + 4, writer);
+                    try entry.value_ptr.*.serializeInternal(indent + 4, writer);
                     _ = try writer.write(";\n");
                 }
 
