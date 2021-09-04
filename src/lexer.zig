@@ -130,6 +130,7 @@ pub const Lexer = struct {
             '&' => self.makeToken(if (self.matches('&')) .amp else .unused, 0),
             '|' => self.makeToken(if (self.matches('|')) .orop else .unused, 0),
             '\"' => self.string(),
+            '\\' => self.rawString(),
             else => {
                 if (std.ascii.isDigit(c)) return self.number();
                 if (std.ascii.isAlpha(c) or c == '_') {
@@ -159,6 +160,17 @@ pub const Lexer = struct {
         _ = self.next();
 
         return tok;
+    }
+
+    fn rawString(self: *Self) Token {
+        // Zig style raw strings
+        if (self.next() == '\\') {
+            const start = self.pos;
+            while (self.next() != '\n') {}
+
+            return self.makeToken(.string, start);
+        }
+        return self.makeToken(.eof, 0);
     }
 
     fn number(self: *Self) Token {
