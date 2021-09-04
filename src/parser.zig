@@ -150,7 +150,8 @@ pub const Parser = struct {
 
     inline fn binOpPrec(self: *Self) isize {
         return switch (self.token.toktype) {
-            .amp, .orop => 9,
+            .amp, .orop => 8,
+            .equality => 9,
             .greater, .less, .greateql, .lesseql => 10,
             .plus, .concat, .minus => 12,
             .multiply, .repeat, .divide, .floor, .modulo => 13,
@@ -195,6 +196,7 @@ pub const Parser = struct {
                         switch (oper) {
                             .amp => lhs.value.boo = lhs.value.boo and rhs.value.boo,
                             .orop => lhs.value.boo = lhs.value.boo or rhs.value.boo,
+                            .equality => lhs.value.boo = lhs.eql(&rhs),
                             else => return self.setErrorContext(ParseError.invalid_operator),
                         }
                     } else return self.setErrorContext(ParseError.mismatched_operands);
@@ -215,6 +217,7 @@ pub const Parser = struct {
                                     .less => booldata.value.boo = lhs.value.num < rhs.value.num,
                                     .greateql => booldata.value.boo = lhs.value.num >= rhs.value.num,
                                     .lesseql => booldata.value.boo = lhs.value.num <= rhs.value.num,
+                                    .equality => booldata.value.boo = lhs.eql(&rhs),
                                     else => return self.setErrorContext(ParseError.invalid_operator),
                                 }
                                 lhs = booldata;
@@ -226,6 +229,13 @@ pub const Parser = struct {
                     if (rhs.value == .str) {
                         switch (oper) {
                             .concat => try lhs.value.str.appendSlice(rhs.value.str.items),
+                            .equality => {
+                                const res = lhs.eql(&rhs);
+                                lhs.free();
+                                lhs = Data{ .name = "", .value = .{
+                                    .boo = res,
+                                } };
+                            },
                             else => return self.setErrorContext(ParseError.invalid_operator),
                         }
                     } else if (rhs.value == .num) {

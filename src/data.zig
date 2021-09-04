@@ -59,6 +59,17 @@ pub const Data = struct {
             else => unreachable,
         };
     }
+    
+    // Unsafe, check for matching tags separately
+    pub fn eql(self: *Self, data: *Data) bool {     
+        return switch (self.value) {
+            .boo => self.value.boo == data.value.boo,
+            .num => self.value.num == data.value.num,
+            .str => std.mem.eql(u8, self.value.str.items, data.value.str.items),
+            .arr => false, // TODO
+            .map => false, // TODO
+        };
+    }
 
     pub fn makeCopy(self: *const Self, allocator: *Allocator) Allocator.Error!Self {
         switch (self.value) {
