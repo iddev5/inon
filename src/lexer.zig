@@ -178,6 +178,22 @@ pub const Lexer = struct {
         while (std.ascii.isDigit(self.peek()))
             _ = self.next();
 
+        if (self.peek() == '.' and std.ascii.isDigit(self.src[self.pos + 1])) {
+            _ = self.next();
+            while (std.ascii.isDigit(self.peek()))
+                _ = self.next();
+        }
+
+        if (self.peek() == 'e' or self.peek() == 'E') {
+            _ = self.next();
+
+            if (self.peek() == '-' or self.peek() == '+')
+                _ = self.next();
+
+            while (std.ascii.isDigit(self.peek()))
+                _ = self.next();
+        }
+
         return self.makeToken(.number, start);
     }
 
