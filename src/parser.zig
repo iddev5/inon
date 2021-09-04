@@ -52,11 +52,15 @@ pub const Parser = struct {
                 _ = self.advance();
                 var str = Data.initString("", self.allocator);
                 try str.value.str.appendSlice(token.content);
-                while (self.token.toktype == .string) {
-                    try str.value.str.appendSlice(self.token.content);
-                    _ = self.advance();
+
+                // Multi line string
+                if (self.token.toktype == .string) {
+                    while (self.token.toktype == .string) {
+                        try str.value.str.appendSlice(self.token.content);
+                        _ = self.advance();
+                    }
+                    _ = str.value.str.pop();
                 }
-                _ = str.value.str.pop();
 
                 return str;
             },
