@@ -17,15 +17,10 @@ pub const Parser = struct {
 
     pub const ErrorContext = struct {
         line: usize,
-        err: ParseError,
+        err: []const u8,
     };
 
-    pub const ParseError = error{
-        invalid_operator,
-        mismatched_operands,
-    };
-
-    pub const Error = Allocator.Error || std.fmt.ParseFloatError || ParseError;
+    pub const Error = Allocator.Error || std.fmt.ParseFloatError || error{ParseError};
 
     pub fn init(src: []const u8, allocator: *Allocator) Self {
         return .{
@@ -40,9 +35,9 @@ pub const Parser = struct {
         self.lexer.free();
     }
 
-    fn skipBlock(self: *Self, begin: lex.TokenType, end: lex.TokenType) void {
+    fn skipBlock(self: *Self, begin: lex.TokenType, end: lex.TokenType) !void {
         if (self.token.toktype != begin)
-            unreachable;
+            return self.setErrorContext("Expected block");
 
         var count: usize = 1;
         while (count > 0) {
@@ -55,10 +50,12 @@ pub const Parser = struct {
     }
 
     fn parseReturnValue(self: *Self, source: *Data) Error!Data {
-        if (self.token.toktype != .lbra) unreachable;
+        if (self.token.toktype != .lbra)
+            return self.setErrorContext("Expected '{'");
         _ = self.advance();
         const ret = try self.parseExpr(source);
-        if (self.token.toktype != .rbra) unreachable;
+        if (self.token.toktype != .rbra)
+            return self.setErrorContext("Expected '}'");
         _ = self.advance();
         return ret;
     }
@@ -143,7 +140,8 @@ pub const Parser = struct {
                 while (self.token.toktype == .iff) {
                     _ = self.advance();
                     const res = try self.parseParenExpr(source);
-                    if (res.value != .boo) unreachable;
+                    if (res.value != .boo)
+                        return self.setErrorContext("Expected bool expression as condition");
 
                     const expr = try self.parseReturnValue(source);
                     if (res.value.boo == true) {
@@ -153,19 +151,23 @@ pub const Parser = struct {
                             if (self.token.toktype == .iff) {
                                 // Skip condition
                                 _ = self.advance();
-                                self.skipBlock(.lpar, .rpar);
+                                try self.skipBlock(.lpar, .rpar);
                             }
 
                             // Skip return block
-                            self.skipBlock(.lbra, .rbra);
+                            try self.skipBlock(.lbra, .rbra);
                         }
                         return expr;
                     }
 
                     // Else part
-                    if (self.token.toktype != .els) unreachable;
+                    if (self.token.toktype != .els)
+                        return self.setErrorContext("Expected 'else' after 'if'");
+
                     _ = self.advance();
-                    if (self.token.toktype == .iff) continue;
+                    if (self.token.toktype == .iff)
+                        continue;
+
                     return try self.parseReturnValue(source);
                 }
 
@@ -188,7 +190,7 @@ pub const Parser = struct {
             var val = try self.unOp(source);
             switch (val.value) {
                 .num => val.value.num = -val.value.num,
-                else => return self.setErrorContext(ParseError.mismatched_operands),
+                else => return self.setErrorContext("'negate' operator not used with num type"),
             }
             return val;
         } else if (token.toktype == .bang) {
@@ -196,7 +198,7 @@ pub const Parser = struct {
             var val = try self.unOp(source);
             switch (val.value) {
                 .boo => val.value.boo = !val.value.boo,
-                else => return self.setErrorContext(ParseError.mismatched_operands),
+                else => return self.setErrorContext("'not' operator not used with bool type"),
             }
             return val;
         }
@@ -253,9 +255,9 @@ pub const Parser = struct {
                             .amp => lhs.value.boo = lhs.value.boo and rhs.value.boo,
                             .orop => lhs.value.boo = lhs.value.boo or rhs.value.boo,
                             .equality => lhs.value.boo = lhs.eql(&rhs),
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            else => return self.setErrorContext("Invalid operand used with logical operator"),
                         }
-                    } else return self.setErrorContext(ParseError.mismatched_operands);
+                    } else return self.setErrorContext("Mismatched operand types, expected bool and bool");
                 },
                 .num => {
                     if (rhs.value == .num) {
@@ -274,12 +276,12 @@ pub const Parser = struct {
                                     .greateql => booldata.value.boo = lhs.value.num >= rhs.value.num,
                                     .lesseql => booldata.value.boo = lhs.value.num <= rhs.value.num,
                                     .equality => booldata.value.boo = lhs.eql(&rhs),
-                                    else => return self.setErrorContext(ParseError.invalid_operator),
+                                    else => return self.setErrorContext("Invalid operand used with arithmetic operator"),
                                 }
                                 lhs = booldata;
                             },
                         }
-                    } else return self.setErrorContext(ParseError.mismatched_operands);
+                    } else return self.setErrorContext("Mismatched operand types, expected num and num");
                 },
                 .str => {
                     if (rhs.value == .str) {
@@ -292,7 +294,7 @@ pub const Parser = struct {
                                     .boo = res,
                                 } };
                             },
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            else => return self.setErrorContext("Invalid operator used for string operations"),
                         }
                     } else if (rhs.value == .num) {
                         switch (oper) {
@@ -310,9 +312,9 @@ pub const Parser = struct {
                                 lhs.value.str.shrinkAndFree(0);
                                 try lhs.value.str.append(ch);
                             },
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            else => return self.setErrorContext("Invalid operator used for string operations"),
                         }
-                    } else return self.setErrorContext(ParseError.mismatched_operands);
+                    } else return self.setErrorContext("Mismatched operand types, expected str and str or num");
                 },
                 .arr => {
                     if (rhs.value == .arr) {
@@ -323,7 +325,7 @@ pub const Parser = struct {
                                 while (i < rhs.value.arr.items.len) : (i += 1)
                                     try lhs.value.arr.append(rhs.value.arr.items[i]);
                             },
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            else => return self.setErrorContext("Invalid operand used for array operations"),
                         }
                     } else if (rhs.value == .num) {
                         switch (oper) {
@@ -332,9 +334,9 @@ pub const Parser = struct {
                                 lhs.free();
                                 lhs = try item.makeCopy(self.allocator);
                             },
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            else => return self.setErrorContext("Invalid operand used for array operations"),
                         }
-                    } else return self.setErrorContext(ParseError.mismatched_operands);
+                    } else return self.setErrorContext("Mismatched operand types, expected array and num");
                 },
                 .map => {
                     if (rhs.value == .str) {
@@ -343,9 +345,9 @@ pub const Parser = struct {
                                 var obj = self.global.value.map.get(rhs.value.str.items).?;
                                 lhs = try obj.makeCopy(self.allocator);
                             },
-                            else => return self.setErrorContext(ParseError.invalid_operator),
+                            else => return self.setErrorContext("Invalid operand used for map operations"),
                         }
-                    } else return self.setErrorContext(ParseError.mismatched_operands);
+                    } else return self.setErrorContext("Mismatched operand types, expected map and str");
                 },
             }
 
@@ -362,11 +364,11 @@ pub const Parser = struct {
 
     fn parseParenExpr(self: *Self, source: *Data) Error!Data {
         if (self.token.toktype != .lpar)
-            return ParseError.invalid_operator;
+            return self.setErrorContext("Expected '('");
         _ = self.advance();
         var res = try self.parseExpr(source);
         if (self.token.toktype != .rpar)
-            return ParseError.invalid_operator;
+            return self.setErrorContext("Expected ')'");
         _ = self.advance();
         return res;
     }
@@ -413,13 +415,13 @@ pub const Parser = struct {
         return self.token.toktype;
     }
 
-    fn setErrorContext(self: *Self, err: ParseError) Error {
+    fn setErrorContext(self: *Self, err: []const u8) Error {
         self.error_context = .{
             .line = self.lexer.line,
             .err = err,
         };
 
-        return err;
+        return error.ParseError;
     }
 
     pub fn getErrorContext(self: *Self) ?ErrorContext {

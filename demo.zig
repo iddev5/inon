@@ -6,7 +6,7 @@ pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = &gpa.allocator;
 
-    const stdio = std.io.getStdOut().writer();
+    const stdout = std.io.getStdOut().writer();
 
     var inon = Inon.init(allocator);
     defer inon.free();
@@ -29,21 +29,18 @@ pub fn main() anyerror!void {
         \\};
         \\phone_nos = [100, 200, 300];
         \\second_no = phone_nos.1;
-    ) catch |err| {
-        if (inon.parser.getErrorContext()) |error_context| {
-            switch (error_context.err) {
-                ParseError.invalid_operator => std.debug.print("line {}: invalid operator\n", .{error_context.line}),
-                ParseError.mismatched_operands => std.debug.print("line {}: mismatched operands of different types\n", .{error_context.line}),
-                else => return err,
-            }
-        }
-        return err;
+    ) catch |err| switch (err) {
+        error.ParseError => {
+            try inon.renderError(stdout);
+            return;
+        },
+        else => |e| return e,
     };
     defer data.free();
 
-    try stdio.print("Deserialized: \n\n", .{});
-    try stdio.print("{s}\n\n", .{@TypeOf(data.value.map)});
+    try stdout.print("Deserialized: \n\n", .{});
+    try stdout.print("{s}\n\n", .{@TypeOf(data.value.map)});
 
-    try stdio.print("Serialized: \n\n", .{});
-    try inon.serialize(stdio);
+    try stdout.print("Serialized: \n\n", .{});
+    try inon.serialize(stdout);
 }

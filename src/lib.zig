@@ -15,6 +15,12 @@ pub const Inon = struct {
             .allocator = allocator,
         };
     }
+    
+    pub fn renderError(self: *Self, writer: std.fs.File.Writer) !void {
+        if (self.parser.getErrorContext()) |error_context| {
+            try writer.print("line {}: {s}\n", .{ error_context.line, error_context.err });
+        }
+    }
 
     pub fn deserialize(self: *Self, reader: std.fs.File.Reader) !Data {
         const src = reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
