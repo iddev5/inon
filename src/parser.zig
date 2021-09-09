@@ -40,6 +40,29 @@ pub const Parser = struct {
         self.lexer.free();
     }
 
+    fn skipBlock(self: *Self, begin: lex.TokenType, end: lex.TokenType) void {
+        if (self.token.toktype != begin)
+            unreachable;
+
+        var count: usize = 1;
+        while (count > 0) {
+            _ = self.advance();
+            if (self.token.toktype == begin) count += 1;
+            if (self.token.toktype == end) count -= 1;
+        }
+
+        _ = self.advance();
+    }
+
+    fn parseReturnValue(self: *Self, source: *Data) Error!Data {
+        if (self.token.toktype != .lbra) unreachable;
+        _ = self.advance();
+        const ret = try self.parseExpr(source);
+        if (self.token.toktype != .rbra) unreachable;
+        _ = self.advance();
+        return ret;
+    }
+
     fn parseAtom(self: *Self, source: *Data) Error!Data {
         const token = self.token;
         switch (token.toktype) {
@@ -114,6 +137,39 @@ pub const Parser = struct {
                 }
 
                 return val;
+            },
+            .iff => {
+                // TODO: better errors
+                while (self.token.toktype == .iff) {
+                    _ = self.advance();
+                    const res = try self.parseParenExpr(source);
+                    if (res.value != .boo) unreachable;
+
+                    const expr = try self.parseReturnValue(source);
+                    if (res.value.boo == true) {
+                        // Skip else part
+                        while (self.token.toktype == .els) {
+                            _ = self.advance();
+                            if (self.token.toktype == .iff) {
+                                // Skip condition
+                                _ = self.advance();
+                                self.skipBlock(.lpar, .rpar);
+                            }
+
+                            // Skip return block
+                            self.skipBlock(.lbra, .rbra);
+                        }
+                        return expr;
+                    }
+
+                    // Else part
+                    if (self.token.toktype != .els) unreachable;
+                    _ = self.advance();
+                    if (self.token.toktype == .iff) continue;
+                    return try self.parseReturnValue(source);
+                }
+
+                unreachable;
             },
             else => {
                 return try self.parseParenExpr(source);

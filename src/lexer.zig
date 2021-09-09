@@ -6,6 +6,8 @@ pub const TokenType = enum {
     number,
     tru,
     fals,
+    iff,
+    els,
 
     assignment,
     equality,
@@ -139,6 +141,10 @@ pub const Lexer = struct {
                         return self.makeToken(.tru, 0);
                     } else if (std.mem.eql(u8, ident.content, "false")) {
                         return self.makeToken(.fals, 0);
+                    } else if (std.mem.eql(u8, ident.content, "if")) {
+                        return self.makeToken(.iff, 0);
+                    } else if (std.mem.eql(u8, ident.content, "else")) {
+                        return self.makeToken(.els, 0);
                     } else return ident;
                 }
                 return self.makeToken(.eof, 0);

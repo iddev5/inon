@@ -14,9 +14,17 @@ pub fn main() anyerror!void {
     var data = inon.deserializeFromMemory(
         \\first_name = "joe";
         \\last_name = "something";
-        \\age = 30;
+        \\age = 50;
         \\address = {
-        \\    street_no = 420;
+        \\    street_no = 
+        \\        if (global.age == 30) 
+        \\            { 420 } 
+        \\        else if (global.age == 40) 
+        \\            { 40 } 
+        \\        else if (global.age == 50) 
+        \\            { 50 } 
+        \\        else 
+        \\            { 60 };
         \\    city = "nyc";
         \\};
         \\phone_nos = [100, 200, 300];

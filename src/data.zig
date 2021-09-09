@@ -59,9 +59,9 @@ pub const Data = struct {
             else => unreachable,
         };
     }
-    
+
     // Unsafe, check for matching tags separately
-    pub fn eql(self: *Self, data: *Data) bool {     
+    pub fn eql(self: *Self, data: *Data) bool {
         return switch (self.value) {
             .boo => self.value.boo == data.value.boo,
             .num => self.value.num == data.value.num,
@@ -108,7 +108,7 @@ pub const Data = struct {
         try self.serializeInternal(indent, writer);
         try writer.print(";\n", .{});
     }
-    
+
     fn serializeInternal(self: *Self, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
         if (!std.mem.eql(u8, self.name, "")) {
             _ = try writer.writeByteNTimes(' ', indent);
