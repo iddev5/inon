@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const TokenType = enum {
     string,
+    raw_string,
     identifier,
     number,
     tru,
@@ -174,7 +175,7 @@ pub const Lexer = struct {
             const start = self.pos;
             while (self.next() != '\n') {}
 
-            return self.makeToken(.string, start);
+            return self.makeToken(.raw_string, start);
         }
         return self.makeToken(.eof, 0);
     }

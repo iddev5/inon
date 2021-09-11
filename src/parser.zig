@@ -71,16 +71,38 @@ pub const Parser = struct {
             .string => {
                 _ = self.advance();
                 var str = Data.initString("", self.allocator);
+
+                // Handle escape sequence in strings
+                var index: usize = 0;
+                while (index < token.content.len) : (index += 1) {
+                    try str.value.str.append(if (token.content[index] == '\\') blk: {
+                        index += 1;
+                        break :blk switch (token.content[index]) {
+                            'r' => '\r',
+                            't' => '\t',
+                            'n' => '\n',
+                            '\"' => '\"',
+                            '\'' => '\'',
+                            '\\' => '\\',
+                            else => token.content[index],
+                        };
+                    } else token.content[index]);
+                }
+
+                return str;
+            },
+            .raw_string => {
+                _ = self.advance();
+                var str = Data.initString("", self.allocator);
+
                 try str.value.str.appendSlice(token.content);
 
-                // Multi line string
-                if (self.token.toktype == .string) {
-                    while (self.token.toktype == .string) {
-                        try str.value.str.appendSlice(self.token.content);
-                        _ = self.advance();
-                    }
-                    _ = str.value.str.pop();
+                // Multi line string concat
+                while (self.token.toktype == .raw_string) {
+                    try str.value.str.appendSlice(self.token.content);
+                    _ = self.advance();
                 }
+                _ = str.value.str.pop();
 
                 return str;
             },
