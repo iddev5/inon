@@ -407,9 +407,9 @@ pub const Parser = struct {
 
                     try map.put(key, val);
 
-                    if (self.token.toktype != .semicolon) {
-                        return;
-                    }
+                    if (self.token.toktype != .semicolon)
+                        return self.setErrorContext("Expected ';' at the end of statement");
+
                     _ = self.advance();
                 },
                 else => return,
