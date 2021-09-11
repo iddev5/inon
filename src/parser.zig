@@ -75,7 +75,7 @@ pub const Parser = struct {
                 // Handle escape sequence in strings
                 var index: usize = 0;
                 while (index < token.content.len) : (index += 1) {
-                    try str.value.str.append(if (token.content[index] == '\\') blk: {
+                    try str.value.str.append(if (token.content[index] == '\\' and index + 1 < token.content.len) blk: {
                         index += 1;
                         break :blk switch (token.content[index]) {
                             'r' => '\r',
