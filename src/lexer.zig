@@ -160,8 +160,11 @@ pub const Lexer = struct {
     fn string(self: *Self) Token {
         _ = self.next();
         const start = self.pos - 1;
-        while (self.peek() != '\"')
+        while (self.peek() != '\"') {
+            if (self.peek() == '\\')
+                _ = self.next();
             _ = self.next();
+        }
 
         const tok = self.makeToken(.string, start);
         _ = self.next();
