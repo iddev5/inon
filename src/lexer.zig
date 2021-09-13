@@ -215,3 +215,119 @@ pub const Lexer = struct {
         return self.makeToken(.identifier, start);
     }
 };
+
+fn expectTokenTypes(src: []const u8, tokens: []const TokenType) !void {
+    var lexer = Lexer.init(src);
+    defer lexer.free();
+    for (tokens) |token| {
+        try std.testing.expectEqual(token, lexer.getToken().toktype);
+    }
+}
+
+fn expectToken(src: []const u8, tokens: []const Token) !void {
+    var lexer = Lexer.init(src);
+    defer lexer.free();
+    for (tokens) |token| {
+        const this_tok = lexer.getToken();
+        try std.testing.expectEqual(token.toktype, this_tok.toktype);
+        try std.testing.expectEqualStrings(token.content, this_tok.content);
+    }
+}
+
+test "operators" {
+    try expectTokenTypes(
+        \\ + - * /
+        \\ ++ **
+        \\ % //
+        \\ && || .
+        \\ = == > < >= <=
+        \\ !
+    , &[_]TokenType{
+        .plus,
+        .minus,
+        .multiply,
+        .divide,
+        .concat,
+        .repeat,
+        .modulo,
+        .floor,
+        .amp,
+        .orop,
+        .dot,
+        .assignment,
+        .equality,
+        .greater,
+        .less,
+        .greateql,
+        .lesseql,
+        .bang,
+    });
+}
+
+test "symbols" {
+    try expectTokenTypes(
+        \\ ; 
+        \\ ( ) 
+        \\ { } 
+        \\ [ ] 
+        \\ ,
+    , &[_]TokenType{
+        .semicolon,
+        .lpar,
+        .rpar,
+        .lbra,
+        .rbra,
+        .lsqr,
+        .rsqr,
+        .comma,
+    });
+}
+
+test "keywords" {
+    try expectTokenTypes(
+        \\ true false if else
+    , &[_]TokenType{
+        .tru,
+        .fals,
+        .iff,
+        .els,
+    });
+}
+
+test "numbers" {
+    try expectToken(
+        \\ 11
+        \\ 20.04
+        \\ 4.0E12
+        \\ 5.1e-11
+    , &[_]Token{
+        .{ .toktype = .number, .content = "11" },
+        .{ .toktype = .number, .content = "20.04" },
+        .{ .toktype = .number, .content = "4.0E12" },
+        .{ .toktype = .number, .content = "5.1e-11" },
+    });
+}
+
+test "identifiers" {
+    try expectToken(
+        \\ test
+        \\ __complex__
+        \\ mix_2130
+    , &[_]Token{
+        .{ .toktype = .identifier, .content = "test" },
+        .{ .toktype = .identifier, .content = "__complex__" },
+        .{ .toktype = .identifier, .content = "mix_2130" },
+    });
+}
+
+test "strings" {
+    try expectToken(
+        \\ "hello world"
+        \\ "\tescape\tworld\"\n"
+        \\ \\long long
+    , &[_]Token{
+        .{ .toktype = .string, .content = "hello world" },
+        .{ .toktype = .string, .content = "\\tescape\\tworld\\\"\\n" },
+        .{ .toktype = .raw_string, .content = "long long" },
+    });
+}
