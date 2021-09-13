@@ -176,7 +176,7 @@ pub const Lexer = struct {
         // Zig style raw strings
         if (self.next() == '\\') {
             const start = self.pos;
-            while (self.next() != '\n') {}
+            while (!self.isEof() and self.next() != '\n') {}
 
             return self.makeToken(.raw_string, start);
         }
