@@ -44,8 +44,20 @@ pub const Data = struct {
     pub fn free(self: *Self) void {
         switch (self.value) {
             .str => self.value.str.deinit(),
-            .arr => self.value.arr.deinit(),
-            .map => self.value.map.deinit(),
+            .arr => {
+                for (self.value.arr.items) |item| {
+                    var i = item;
+                    i.free();
+                }
+                self.value.arr.deinit();
+            },
+            .map => {
+                var iter = self.value.map.valueIterator();
+                while (iter.next()) |value| {
+                    value.*.free();
+                }
+                self.value.map.deinit();
+            },
             else => {},
         }
     }
