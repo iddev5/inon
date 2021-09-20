@@ -450,3 +450,28 @@ pub const Parser = struct {
         return self.error_context;
     }
 };
+
+test "basic test" {
+    const allocator = std.testing.allocator;
+    const expectEqual = std.testing.expectEqual;
+    const expectEqualStrings = std.testing.expectEqualStrings;
+
+    var parser = Parser.init(
+        \\ num = 10;
+        \\ str = "string";
+        \\ raw_str = \\multi-lined
+        \\ \\ raw_string
+        \\ ;
+        \\ array = ["test", 10, "element" ];
+        \\ table = {
+        \\     hello = "world";
+        \\ };
+    , allocator);
+    defer parser.free();
+    try parser.parse();
+    defer parser.global.free();
+
+    try expectEqual(@as(f64, 10), (try parser.global.findData("num")).value.num);
+    try expectEqualStrings("string", (try parser.global.findData("str")).value.str.items);
+    try expectEqualStrings("multi-lined\n raw_string", (try parser.global.findData("raw_str")).value.str.items);
+}
