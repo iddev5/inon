@@ -17,14 +17,15 @@ pub fn main() anyerror!void {
         \\age = 50;
         \\address = {
         \\    street_no = 
-        \\        if (global.age == 30) 
+        \\        if (age == 30) 
         \\            { 420 } 
-        \\        else if (global.age == 40) 
+        \\        else if (age == 40) 
         \\            { 40 } 
-        \\        else if (global.age == 50) 
+        \\        else if (age == 50) 
         \\            { 50 } 
         \\        else 
         \\            { 60 };
+        \\    num = self.street_no * 2;
         \\    city = "nyc";
         \\};
         \\phone_nos = [100, 200, 300];

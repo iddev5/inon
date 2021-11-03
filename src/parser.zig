@@ -132,10 +132,10 @@ pub const Parser = struct {
             .identifier => {
                 _ = self.advance();
                 var val = blk: {
-                    if (std.mem.eql(u8, token.content, "global")) {
-                        break :blk self.global;
+                    if (std.mem.eql(u8, token.content, "self")) {
+                        break :blk source.*;
                     } else {
-                        var obj = source.value.map.get(token.content).?;
+                        var obj = self.global.value.map.get(token.content).?;
                         break :blk try obj.makeCopy(self.allocator);
                     }
                 };
