@@ -4,19 +4,20 @@ const Allocator = std.mem.Allocator;
 const Data = @This();
 
 name: []const u8,
-value: union(DataType) {
+value: union(Type) {
     bool: bool,
     num: f64,
     str: String,
     array: std.ArrayList(Data),
     map: std.StringHashMap(Data),
 },
+allocator: *Allocator = undefined,
 
 pub const String = std.ArrayList(u8);
 pub const Array = std.ArrayList(Data);
 pub const Map = std.StringHashMap(Data);
 
-pub const DataType = enum {
+pub const Type = enum(u8) {
     bool,
     num,
     str,
@@ -28,6 +29,7 @@ pub fn initString(name: []const u8, allocator: Allocator) Data {
     return .{
         .name = name,
         .value = .{ .str = String.init(allocator) },
+        .allocator = allocator,
     };
 }
 
@@ -35,6 +37,7 @@ pub fn initArray(name: []const u8, allocator: Allocator) Data {
     return .{
         .name = name,
         .value = .{ .array = std.ArrayList(Data).init(allocator) },
+        .allocator = allocator,
     };
 }
 
@@ -42,6 +45,7 @@ pub fn initMap(name: []const u8, allocator: Allocator) Data {
     return .{
         .name = name,
         .value = .{ .map = std.StringHashMap(Data).init(allocator) },
+        .allocator = allocator,
     };
 }
 
@@ -77,7 +81,7 @@ pub fn get(self: *Data, name: []const u8) !Data {
 }
 
 // Unsafe, check for matching tags separately
-pub fn eql(self: *Data, data: *Data) bool {
+pub fn eql(self: *const Data, data: *const Data) bool {
     return switch (self.value) {
         .bool => self.value.bool == data.value.bool,
         .num => self.value.num == data.value.num,
