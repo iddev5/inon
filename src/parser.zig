@@ -3,8 +3,7 @@ const Allocator = std.mem.Allocator;
 const lex = @import("lexer.zig");
 const Lexer = lex.Lexer;
 const Token = lex.Token;
-const data = @import("data.zig");
-const Data = data.Data;
+const Data = @import("Data.zig");
 
 pub const Parser = struct {
     lexer: Lexer,
@@ -108,13 +107,13 @@ pub const Parser = struct {
             },
             .tru, .fals => {
                 _ = self.advance();
-                return Data{ .name = "", .value = .{ .boo = if (token.toktype == .tru) true else false } };
+                return Data{ .name = "", .value = .{ .bool = if (token.toktype == .tru) true else false } };
             },
             .lsqr => {
                 _ = self.advance();
                 var arr = Data.initArray("", self.allocator);
                 while (self.token.toktype != .rsqr) {
-                    try arr.value.arr.append(try self.parseExpr(source));
+                    try arr.value.array.append(try self.parseExpr(source));
                     if (self.token.toktype != .comma) {
                         _ = self.advance();
                         return arr;
@@ -136,7 +135,7 @@ pub const Parser = struct {
                         break :blk source.*;
                     } else {
                         var obj = self.global.value.map.get(token.content).?;
-                        break :blk try obj.makeCopy(self.allocator);
+                        break :blk try obj.copy(self.allocator);
                     }
                 };
 
@@ -150,7 +149,7 @@ pub const Parser = struct {
                         if (self.token.toktype == .identifier) {
                             const subval = val.value.map.get(self.token.content).?;
                             _ = self.advance();
-                            return subval.makeCopy(self.allocator);
+                            return subval.copy(self.allocator);
                         }
                     }
                 }
@@ -162,11 +161,11 @@ pub const Parser = struct {
                 while (self.token.toktype == .iff) {
                     _ = self.advance();
                     const res = try self.parseParenExpr(source);
-                    if (res.value != .boo)
+                    if (res.value != .bool)
                         return self.setErrorContext("Expected bool expression as condition");
 
                     const expr = try self.parseReturnValue(source);
-                    if (res.value.boo == true) {
+                    if (res.value.bool == true) {
                         // Skip else part
                         while (self.token.toktype == .els) {
                             _ = self.advance();
@@ -219,7 +218,7 @@ pub const Parser = struct {
             _ = self.advance();
             var val = try self.unOp(source);
             switch (val.value) {
-                .boo => val.value.boo = !val.value.boo,
+                .bool => val.value.bool = !val.value.bool,
                 else => return self.setErrorContext("'not' operator not used with bool type"),
             }
             return val;
@@ -271,12 +270,12 @@ pub const Parser = struct {
             }
 
             switch (lhs.value) {
-                .boo => {
-                    if (rhs.value == .boo) {
+                .bool => {
+                    if (rhs.value == .bool) {
                         switch (oper) {
-                            .amp => lhs.value.boo = lhs.value.boo and rhs.value.boo,
-                            .orop => lhs.value.boo = lhs.value.boo or rhs.value.boo,
-                            .equality => lhs.value.boo = lhs.eql(&rhs),
+                            .amp => lhs.value.bool = lhs.value.bool and rhs.value.bool,
+                            .orop => lhs.value.bool = lhs.value.bool or rhs.value.bool,
+                            .equality => lhs.value.bool = lhs.eql(&rhs),
                             else => return self.setErrorContext("Invalid operand used with logical operator"),
                         }
                     } else return self.setErrorContext("Mismatched operand types, expected bool and bool");
@@ -291,13 +290,13 @@ pub const Parser = struct {
                             .floor => lhs.value.num = @divFloor(lhs.value.num, rhs.value.num),
                             .modulo => lhs.value.num = @mod(lhs.value.num, rhs.value.num),
                             else => {
-                                var booldata = Data{ .name = "", .value = .{ .boo = false } };
+                                var booldata = Data{ .name = "", .value = .{ .bool = false } };
                                 switch (oper) {
-                                    .greater => booldata.value.boo = lhs.value.num > rhs.value.num,
-                                    .less => booldata.value.boo = lhs.value.num < rhs.value.num,
-                                    .greateql => booldata.value.boo = lhs.value.num >= rhs.value.num,
-                                    .lesseql => booldata.value.boo = lhs.value.num <= rhs.value.num,
-                                    .equality => booldata.value.boo = lhs.eql(&rhs),
+                                    .greater => booldata.value.bool = lhs.value.num > rhs.value.num,
+                                    .less => booldata.value.bool = lhs.value.num < rhs.value.num,
+                                    .greateql => booldata.value.bool = lhs.value.num >= rhs.value.num,
+                                    .lesseql => booldata.value.bool = lhs.value.num <= rhs.value.num,
+                                    .equality => booldata.value.bool = lhs.eql(&rhs),
                                     else => return self.setErrorContext("Invalid operand used with arithmetic operator"),
                                 }
                                 lhs = booldata;
@@ -313,7 +312,7 @@ pub const Parser = struct {
                                 const res = lhs.eql(&rhs);
                                 lhs.free();
                                 lhs = Data{ .name = "", .value = .{
-                                    .boo = res,
+                                    .bool = res,
                                 } };
                             },
                             else => return self.setErrorContext("Invalid operator used for string operations"),
@@ -338,23 +337,23 @@ pub const Parser = struct {
                         }
                     } else return self.setErrorContext("Mismatched operand types, expected str and str or num");
                 },
-                .arr => {
-                    if (rhs.value == .arr) {
+                .array => {
+                    if (rhs.value == .array) {
                         switch (oper) {
                             .concat => {
                                 var i: usize = 0;
-                                try lhs.value.arr.ensureTotalCapacity(lhs.value.arr.items.len + rhs.value.arr.items.len);
-                                while (i < rhs.value.arr.items.len) : (i += 1)
-                                    try lhs.value.arr.append(rhs.value.arr.items[i]);
+                                try lhs.value.array.ensureTotalCapacity(lhs.value.array.items.len + rhs.value.array.items.len);
+                                while (i < rhs.value.array.items.len) : (i += 1)
+                                    try lhs.value.array.append(rhs.value.array.items[i]);
                             },
                             else => return self.setErrorContext("Invalid operand used for array operations"),
                         }
                     } else if (rhs.value == .num) {
                         switch (oper) {
                             .dot => {
-                                const item = lhs.value.arr.items[@floatToInt(u32, rhs.value.num)];
+                                const item = lhs.value.array.items[@floatToInt(u32, rhs.value.num)];
                                 lhs.free();
-                                lhs = try item.makeCopy(self.allocator);
+                                lhs = try item.copy(self.allocator);
                             },
                             else => return self.setErrorContext("Invalid operand used for array operations"),
                         }
@@ -365,7 +364,7 @@ pub const Parser = struct {
                         switch (oper) {
                             .dot => {
                                 var obj = self.global.value.map.get(rhs.value.str.items).?;
-                                lhs = try obj.makeCopy(self.allocator);
+                                lhs = try obj.copy(self.allocator);
                             },
                             else => return self.setErrorContext("Invalid operand used for map operations"),
                         }
@@ -395,7 +394,7 @@ pub const Parser = struct {
         return res;
     }
 
-    fn parseObjectNoscope(self: *Self, map: *data.MapType, source: *Data) Error!void {
+    fn parseObjectNoscope(self: *Self, map: *Data.Map, source: *Data) Error!void {
         while (self.token.toktype == .identifier) {
             const key = self.token.content;
 
@@ -471,7 +470,7 @@ test "basic test" {
     try parser.parse();
     defer parser.global.free();
 
-    try expectEqual(@as(f64, 10), (try parser.global.findData("num")).value.num);
-    try expectEqualStrings("string", (try parser.global.findData("str")).value.str.items);
-    try expectEqualStrings("multi-lined\n raw_string", (try parser.global.findData("raw_str")).value.str.items);
+    try expectEqual(@as(f64, 10), (try parser.global.get("num")).value.num);
+    try expectEqualStrings("string", (try parser.global.get("str")).value.str.items);
+    try expectEqualStrings("multi-lined\n raw_string", (try parser.global.get("raw_str")).value.str.items);
 }

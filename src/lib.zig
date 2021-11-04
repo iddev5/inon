@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const parse = @import("parser.zig");
 pub const Parser = parse.Parser;
-const Data = @import("data.zig").Data;
+const Data = @import("Data.zig");
 
 pub const Inon = struct {
     allocator: Allocator,
