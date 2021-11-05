@@ -3,7 +3,117 @@ const Allocator = std.mem.Allocator;
 const lex = @import("lexer.zig");
 const Lexer = lex.Lexer;
 const Token = lex.Token;
+const TokenType = lex.TokenType;
 const Data = @import("Data.zig");
+
+const Operation = struct {
+    fn numOp(op: TokenType, a: Data, b: Data) !Data {
+        const a_n = a.value.num;
+        const b_n = b.value.num;
+        return Data{ .name = "", .value = switch (op) {
+            // Arithmetic operators
+            .plus => .{ .num = a_n + b_n },
+            .minus => .{ .num = a_n - b_n },
+            .multiply => .{ .num = a_n * b_n },
+            .divide => .{ .num = a_n / b_n },
+            .floor => .{ .num = @divFloor(a_n, b_n) },
+            .modulo => .{ .num = @mod(a_n, b_n) },
+            // Logic operators
+            .greater => .{ .bool = a_n > b_n },
+            .less => .{ .bool = a_n < b_n },
+            .greateql => .{ .bool = a_n >= b_n },
+            .lesseql => .{ .bool = a_n <= b_n },
+            .equality => .{ .bool = a_n == b_n },
+            else => unreachable,
+        } };
+    }
+
+    fn stringOp(op: TokenType, a: Data, b: Data) !Data {
+        if (b.value == .str) {
+            switch (op) {
+                .concat => {
+                    var ret = try a.copy(a.allocator);
+                    try ret.value.str.appendSlice(b.value.str.items);
+                    return ret;
+                },
+                .equality => {
+                    const res = a.eql(&b);
+                    return Data{ .name = "", .value = .{
+                        .bool = res,
+                    } };
+                },
+                else => unreachable,
+            }
+        } else {
+            switch (op) {
+                .repeat => {
+                    var copy = try a.copy(a.allocator);
+                    errdefer copy.free();
+                    const slice = a.value.str.items;
+
+                    var i: usize = 1;
+                    while (i < @floatToInt(usize, b.value.num)) : (i += 1) {
+                        try copy.value.str.appendSlice(slice);
+                    }
+
+                    return copy;
+                },
+                .dot => {
+                    // TODO: implement char type to prevent allocator
+                    // but have it as an implicit string value
+                    const ch = a.value.str.items[@floatToInt(u32, b.value.num)];
+                    var copy = Data.initString("", a.allocator);
+                    try copy.value.str.append(ch);
+                    return copy;
+                },
+                else => unreachable,
+            }
+        }
+
+        unreachable;
+    }
+    
+    fn arrayOp(op: TokenType, a: Data, b: Data) !Data {
+        if (b.value == .array) {
+            switch (op) {
+                .concat => {
+                    var copy = try a.copy(a.allocator);
+                    try copy.value.array.ensureTotalCapacity(a.value.array.items.len + b.value.array.items.len);
+                
+                    var i: usize = 0;
+                    while (i < b.value.array.items.len) : (i += 1)
+                        try copy.value.array.append(try b.value.array.items[i].copy(a.allocator));
+                    return copy;
+                },
+                else => unreachable,
+            }
+        } else if (b.value == .num) {
+            switch (op) {
+                .dot => {
+                    const item = a.value.array.items[@floatToInt(u32, b.value.num)];
+                    return try item.copy(a.allocator);
+                },
+                else => unreachable,
+            }    
+        }
+        
+        unreachable;
+    }
+    
+    fn mapOp(op: TokenType, a: Data, b: Data) !Data {
+        if (b.value == .str) {
+            switch (op) {
+                .dot => {
+                    var obj = a.value.map.get(b.value.str.items).?;
+                    return try obj.copy(a.allocator);
+                },
+                else => unreachable, 
+            } 
+        }
+        
+        unreachable;
+    }
+};
 
 pub const Parser = struct {
     lexer: Lexer,
@@ -11,6 +121,47 @@ pub const Parser = struct {
     global: Data,
     allocator: Allocator,
     error_context: ?ErrorContext = null,
+
+    const BinOpDesc = struct {
+        op: TokenType,
+        lhs: Data.Type,
+        rhs: Data.Type,
+        func: fn (op: TokenType, a: Data, b: Data) Allocator.Error!Data,
+    };
+
+    // Supported operations:
+    //    num [+][-][*][/][//][%] num -> num
+    //    num [>][<][>=][<=] num -> bool
+    //    str [++] str -> str
+    //    str [**] num -> str
+    //    str [.] num -> str
+    //    arr [++] arr -> arr
+    //    arr [.] num -> Data
+    //    map [.] str -> Data    
+    const bin_op_list = &[_]BinOpDesc{
+        .{ .op = .plus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .minus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .multiply, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .divide, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .floor, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .modulo, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+
+        .{ .op = .greater, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .less, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .greateql, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .lesseql, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .equality, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+
+        .{ .op = .concat, .lhs = .str, .rhs = .str, .func = Operation.stringOp },
+        .{ .op = .equality, .lhs = .str, .rhs = .str, .func = Operation.stringOp },
+        .{ .op = .repeat, .lhs = .str, .rhs = .num, .func = Operation.stringOp },
+        .{ .op = .dot, .lhs = .str, .rhs = .num, .func = Operation.stringOp },
+        
+        .{ .op = .concat, .lhs = .array, .rhs = .array, .func = Operation.arrayOp },
+        .{ .op = .dot, .lhs = .array, .rhs = .num, .func = Operation.arrayOp },
+        
+        .{ .op = .dot, .lhs = .map, .rhs = .str, .func = Operation.mapOp },
+    };
 
     const Self = @This();
 
@@ -239,15 +390,18 @@ pub const Parser = struct {
         };
     }
 
-    // Supported operations:
-    //    num [+][-][*][/][//][%] num -> num
-    //    num [>][<][>=][<=] num -> bool
-    //    str [++] str -> str
-    //    str [**] num -> str
-    //    str [.] num -> str
-    //    arr [++] arr -> arr
-    //    arr [.] num -> Data
-    //    map [.] str -> Data
+    inline fn executeBinOp(self: *Self, op: TokenType, lhs: Data, rhs: Data) !Data {
+        _ = self;
+        for (bin_op_list) |bin_op| {
+            if (bin_op.op == op and lhs.value == bin_op.lhs and rhs.value == bin_op.rhs) {
+                return try bin_op.func(op, lhs, rhs);
+            }
+        }
+
+        // TODO: error on wrong types
+        unreachable;
+    }
+
     fn binOp(self: *Self, prec: isize, lhsx: Data, source: *Data) Error!Data {
         var lhs = lhsx;
         var rhs: Data = undefined;
@@ -269,110 +423,11 @@ pub const Parser = struct {
                 rhs = try self.binOp(tok_prec + 1, rhs, source);
             }
 
-            switch (lhs.value) {
-                .bool => {
-                    if (rhs.value == .bool) {
-                        switch (oper) {
-                            .amp => lhs.value.bool = lhs.value.bool and rhs.value.bool,
-                            .orop => lhs.value.bool = lhs.value.bool or rhs.value.bool,
-                            .equality => lhs.value.bool = lhs.eql(&rhs),
-                            else => return self.setErrorContext("Invalid operand used with logical operator"),
-                        }
-                    } else return self.setErrorContext("Mismatched operand types, expected bool and bool");
-                },
-                .num => {
-                    if (rhs.value == .num) {
-                        switch (oper) {
-                            .plus => lhs.value.num = lhs.value.num + rhs.value.num,
-                            .minus => lhs.value.num = lhs.value.num - rhs.value.num,
-                            .multiply => lhs.value.num = lhs.value.num * rhs.value.num,
-                            .divide => lhs.value.num = lhs.value.num / rhs.value.num,
-                            .floor => lhs.value.num = @divFloor(lhs.value.num, rhs.value.num),
-                            .modulo => lhs.value.num = @mod(lhs.value.num, rhs.value.num),
-                            else => {
-                                var booldata = Data{ .name = "", .value = .{ .bool = false } };
-                                switch (oper) {
-                                    .greater => booldata.value.bool = lhs.value.num > rhs.value.num,
-                                    .less => booldata.value.bool = lhs.value.num < rhs.value.num,
-                                    .greateql => booldata.value.bool = lhs.value.num >= rhs.value.num,
-                                    .lesseql => booldata.value.bool = lhs.value.num <= rhs.value.num,
-                                    .equality => booldata.value.bool = lhs.eql(&rhs),
-                                    else => return self.setErrorContext("Invalid operand used with arithmetic operator"),
-                                }
-                                lhs = booldata;
-                            },
-                        }
-                    } else return self.setErrorContext("Mismatched operand types, expected num and num");
-                },
-                .str => {
-                    if (rhs.value == .str) {
-                        switch (oper) {
-                            .concat => try lhs.value.str.appendSlice(rhs.value.str.items),
-                            .equality => {
-                                const res = lhs.eql(&rhs);
-                                lhs.free();
-                                lhs = Data{ .name = "", .value = .{
-                                    .bool = res,
-                                } };
-                            },
-                            else => return self.setErrorContext("Invalid operator used for string operations"),
-                        }
-                    } else if (rhs.value == .num) {
-                        switch (oper) {
-                            .repeat => {
-                                var i: usize = 1;
-                                const slice = try self.allocator.alloc(u8, lhs.value.str.items.len);
-                                defer self.allocator.free(slice);
-                                std.mem.copy(u8, slice, lhs.value.str.items);
-                                while (i < @floatToInt(usize, rhs.value.num)) : (i += 1) {
-                                    try lhs.value.str.appendSlice(slice);
-                                }
-                            },
-                            .dot => {
-                                const ch = lhs.value.str.items[@floatToInt(u32, rhs.value.num)];
-                                lhs.value.str.shrinkAndFree(0);
-                                try lhs.value.str.append(ch);
-                            },
-                            else => return self.setErrorContext("Invalid operator used for string operations"),
-                        }
-                    } else return self.setErrorContext("Mismatched operand types, expected str and str or num");
-                },
-                .array => {
-                    if (rhs.value == .array) {
-                        switch (oper) {
-                            .concat => {
-                                var i: usize = 0;
-                                try lhs.value.array.ensureTotalCapacity(lhs.value.array.items.len + rhs.value.array.items.len);
-                                while (i < rhs.value.array.items.len) : (i += 1)
-                                    try lhs.value.array.append(rhs.value.array.items[i]);
-                            },
-                            else => return self.setErrorContext("Invalid operand used for array operations"),
-                        }
-                    } else if (rhs.value == .num) {
-                        switch (oper) {
-                            .dot => {
-                                const item = lhs.value.array.items[@floatToInt(u32, rhs.value.num)];
-                                lhs.free();
-                                lhs = try item.copy(self.allocator);
-                            },
-                            else => return self.setErrorContext("Invalid operand used for array operations"),
-                        }
-                    } else return self.setErrorContext("Mismatched operand types, expected array and num");
-                },
-                .map => {
-                    if (rhs.value == .str) {
-                        switch (oper) {
-                            .dot => {
-                                var obj = self.global.value.map.get(rhs.value.str.items).?;
-                                lhs = try obj.copy(self.allocator);
-                            },
-                            else => return self.setErrorContext("Invalid operand used for map operations"),
-                        }
-                    } else return self.setErrorContext("Mismatched operand types, expected map and str");
-                },
-            }
-
+            var val = try self.executeBinOp(oper, lhs, rhs);
+            lhs.free();
             rhs.free();
+            
+            lhs = val;
         }
 
         return lhs;
