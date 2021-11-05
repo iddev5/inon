@@ -1,50 +1,91 @@
 const std = @import("std");
 
-pub const TokenType = enum {
-    string,
-    raw_string,
-    identifier,
-    number,
-    tru,
-    fals,
-    iff,
-    els,
-
-    assignment,
-    equality,
-    plus,
-    concat,
-    minus,
-    multiply,
-    repeat,
-    divide,
-    floor,
-    modulo,
-    greater,
-    less,
-    greateql,
-    lesseql,
-    bang,
-    amp,
-    orop,
-
-    semicolon,
-    lpar,
-    rpar,
-    lbra,
-    rbra,
-    lsqr,
-    rsqr,
-    comma,
-    dot,
-
-    unused,
-    eof,
-};
-
 pub const Token = struct {
-    toktype: TokenType,
+    toktype: Type,
     content: []const u8,
+
+    pub const Type = enum {
+        string,
+        raw_string,
+        identifier,
+        number,
+        @"true",
+        @"false",
+        @"if",
+        @"else",
+
+        assignment,
+        equality,
+        plus,
+        concat,
+        minus,
+        multiply,
+        repeat,
+        divide,
+        floor,
+        modulo,
+        greater,
+        less,
+        greater_eql,
+        less_eql,
+        bang,
+        amp,
+        @"or",
+
+        semicolon,
+        l_paren,
+        r_paren,
+        l_brac,
+        r_brac,
+        l_sqr,
+        r_sqr,
+        comma,
+        dot,
+
+        unused,
+        eof,
+    };
+
+    pub fn string(tok: @This()) []const u8 {
+        return switch (tok.toktype) {
+            .string => "string",
+            .raw_string => "raw string",
+            .identifier => "identifier",
+            .number => "number",
+            .@"true" => "true",
+            .@"false" => "false",
+            .@"if" => "if",
+            .@"else" => "else",
+            .assignment => "=",
+            .equality => "==",
+            .plus => "+",
+            .concat => "++",
+            .minus => "-",
+            .multiply => "*",
+            .repeat => "**",
+            .divide => "/",
+            .floor => "//",
+            .modulo => "%",
+            .greater => ">",
+            .less => "<",
+            .greater_eql => ">=",
+            .less_eql => "<=",
+            .bang => "!",
+            .amp => "&",
+            .@"or" => "||",
+            .semicolon => ";",
+            .l_paren => "(",
+            .r_paren => ")",
+            .l_brac => "{",
+            .r_brac => "}",
+            .l_sqr => "[",
+            .r_sqr => "]",
+            .comma => ",",
+            .dot => ".",
+            .unused => "<UNUSED>",
+            .eof => "<EOF>",
+        };
+    }
 };
 
 pub const Lexer = struct {
@@ -119,19 +160,19 @@ pub const Lexer = struct {
             '*' => self.makeToken(if (self.matches('*')) .repeat else .multiply, 0),
             '/' => self.makeToken(if (self.matches('/')) .floor else .divide, 0),
             '%' => self.makeToken(.modulo, 0),
-            '(' => self.makeToken(.lpar, 0),
-            ')' => self.makeToken(.rpar, 0),
-            '{' => self.makeToken(.lbra, 0),
-            '}' => self.makeToken(.rbra, 0),
-            '[' => self.makeToken(.lsqr, 0),
-            ']' => self.makeToken(.rsqr, 0),
+            '(' => self.makeToken(.l_paren, 0),
+            ')' => self.makeToken(.r_paren, 0),
+            '{' => self.makeToken(.l_brac, 0),
+            '}' => self.makeToken(.r_brac, 0),
+            '[' => self.makeToken(.l_sqr, 0),
+            ']' => self.makeToken(.r_sqr, 0),
             ',' => self.makeToken(.comma, 0),
             '.' => self.makeToken(.dot, 0),
             '!' => self.makeToken(.bang, 0),
-            '>' => self.makeToken(if (self.matches('=')) .greateql else .greater, 0),
-            '<' => self.makeToken(if (self.matches('=')) .lesseql else .less, 0),
+            '>' => self.makeToken(if (self.matches('=')) .greater_eql else .greater, 0),
+            '<' => self.makeToken(if (self.matches('=')) .less_eql else .less, 0),
             '&' => self.makeToken(if (self.matches('&')) .amp else .unused, 0),
-            '|' => self.makeToken(if (self.matches('|')) .orop else .unused, 0),
+            '|' => self.makeToken(if (self.matches('|')) .@"or" else .unused, 0),
             '\"' => self.string(),
             '\\' => self.rawString(),
             else => {
@@ -139,13 +180,13 @@ pub const Lexer = struct {
                 if (std.ascii.isAlpha(c) or c == '_') {
                     const ident = self.identifier();
                     if (std.mem.eql(u8, ident.content, "true")) {
-                        return self.makeToken(.tru, 0);
+                        return self.makeToken(.@"true", 0);
                     } else if (std.mem.eql(u8, ident.content, "false")) {
-                        return self.makeToken(.fals, 0);
+                        return self.makeToken(.@"false", 0);
                     } else if (std.mem.eql(u8, ident.content, "if")) {
-                        return self.makeToken(.iff, 0);
+                        return self.makeToken(.@"if", 0);
                     } else if (std.mem.eql(u8, ident.content, "else")) {
-                        return self.makeToken(.els, 0);
+                        return self.makeToken(.@"else", 0);
                     } else return ident;
                 }
                 return self.makeToken(.eof, 0);
@@ -153,7 +194,7 @@ pub const Lexer = struct {
         };
     }
 
-    inline fn makeToken(self: *Self, toktype: TokenType, start: usize) Token {
+    inline fn makeToken(self: *Self, toktype: Token.Type, start: usize) Token {
         return Token{ .toktype = toktype, .content = self.src[start..self.pos] };
     }
 
@@ -216,7 +257,7 @@ pub const Lexer = struct {
     }
 };
 
-fn expectTokenTypes(src: []const u8, tokens: []const TokenType) !void {
+fn expectTokenTypes(src: []const u8, tokens: []const Token.Type) !void {
     var lexer = Lexer.init(src);
     defer lexer.free();
     for (tokens) |token| {
@@ -242,7 +283,7 @@ test "operators" {
         \\ && || .
         \\ = == > < >= <=
         \\ !
-    , &[_]TokenType{
+    , &[_]Token.Type{
         .plus,
         .minus,
         .multiply,
@@ -252,14 +293,14 @@ test "operators" {
         .modulo,
         .floor,
         .amp,
-        .orop,
+        .@"or",
         .dot,
         .assignment,
         .equality,
         .greater,
         .less,
-        .greateql,
-        .lesseql,
+        .greater_eql,
+        .less_eql,
         .bang,
     });
 }
@@ -271,14 +312,14 @@ test "symbols" {
         \\ { } 
         \\ [ ] 
         \\ ,
-    , &[_]TokenType{
+    , &[_]Token.Type{
         .semicolon,
-        .lpar,
-        .rpar,
-        .lbra,
-        .rbra,
-        .lsqr,
-        .rsqr,
+        .l_paren,
+        .r_paren,
+        .l_brac,
+        .r_brac,
+        .l_sqr,
+        .r_sqr,
         .comma,
     });
 }
@@ -286,11 +327,11 @@ test "symbols" {
 test "keywords" {
     try expectTokenTypes(
         \\ true false if else
-    , &[_]TokenType{
-        .tru,
-        .fals,
-        .iff,
-        .els,
+    , &[_]Token.Type{
+        .@"true",
+        .@"false",
+        .@"if",
+        .@"else",
     });
 }
 

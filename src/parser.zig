@@ -3,32 +3,34 @@ const Allocator = std.mem.Allocator;
 const lex = @import("lexer.zig");
 const Lexer = lex.Lexer;
 const Token = lex.Token;
-const TokenType = lex.TokenType;
 const Data = @import("Data.zig");
 
 const Operation = struct {
-    fn numOp(op: TokenType, a: Data, b: Data) !Data {
+    fn numOp(op: Token.Type, a: Data, b: Data) !Data {
         const a_n = a.value.num;
         const b_n = b.value.num;
-        return Data{ .name = "", .value = switch (op) {
-            // Arithmetic operators
-            .plus => .{ .num = a_n + b_n },
-            .minus => .{ .num = a_n - b_n },
-            .multiply => .{ .num = a_n * b_n },
-            .divide => .{ .num = a_n / b_n },
-            .floor => .{ .num = @divFloor(a_n, b_n) },
-            .modulo => .{ .num = @mod(a_n, b_n) },
-            // Logic operators
-            .greater => .{ .bool = a_n > b_n },
-            .less => .{ .bool = a_n < b_n },
-            .greateql => .{ .bool = a_n >= b_n },
-            .lesseql => .{ .bool = a_n <= b_n },
-            .equality => .{ .bool = a_n == b_n },
-            else => unreachable,
-        } };
+        return Data{
+            .name = "",
+            .value = switch (op) {
+                // Arithmetic operators
+                .plus => .{ .num = a_n + b_n },
+                .minus => .{ .num = a_n - b_n },
+                .multiply => .{ .num = a_n * b_n },
+                .divide => .{ .num = a_n / b_n },
+                .floor => .{ .num = @divFloor(a_n, b_n) },
+                .modulo => .{ .num = @mod(a_n, b_n) },
+                // Logic operators
+                .greater => .{ .bool = a_n > b_n },
+                .less => .{ .bool = a_n < b_n },
+                .greater_eql => .{ .bool = a_n >= b_n },
+                .less_eql => .{ .bool = a_n <= b_n },
+                .equality => .{ .bool = a_n == b_n },
+                else => unreachable,
+            },
+        };
     }
 
-    fn stringOp(op: TokenType, a: Data, b: Data) !Data {
+    fn stringOp(op: Token.Type, a: Data, b: Data) !Data {
         if (b.value == .str) {
             switch (op) {
                 .concat => {
@@ -72,14 +74,14 @@ const Operation = struct {
 
         unreachable;
     }
-    
-    fn arrayOp(op: TokenType, a: Data, b: Data) !Data {
+
+    fn arrayOp(op: Token.Type, a: Data, b: Data) !Data {
         if (b.value == .array) {
             switch (op) {
                 .concat => {
                     var copy = try a.copy(a.allocator);
                     try copy.value.array.ensureTotalCapacity(a.value.array.items.len + b.value.array.items.len);
-                
+
                     var i: usize = 0;
                     while (i < b.value.array.items.len) : (i += 1)
                         try copy.value.array.append(try b.value.array.items[i].copy(a.allocator));
@@ -94,23 +96,23 @@ const Operation = struct {
                     return try item.copy(a.allocator);
                 },
                 else => unreachable,
-            }    
+            }
         }
-        
+
         unreachable;
     }
-    
-    fn mapOp(op: TokenType, a: Data, b: Data) !Data {
+
+    fn mapOp(op: Token.Type, a: Data, b: Data) !Data {
         if (b.value == .str) {
             switch (op) {
                 .dot => {
                     var obj = a.value.map.get(b.value.str.items).?;
                     return try obj.copy(a.allocator);
                 },
-                else => unreachable, 
-            } 
+                else => unreachable,
+            }
         }
-        
+
         unreachable;
     }
 };
@@ -123,10 +125,10 @@ pub const Parser = struct {
     error_context: ?ErrorContext = null,
 
     const BinOpDesc = struct {
-        op: TokenType,
+        op: Token.Type,
         lhs: Data.Type,
         rhs: Data.Type,
-        func: fn (op: TokenType, a: Data, b: Data) Allocator.Error!Data,
+        func: fn (op: Token.Type, a: Data, b: Data) Allocator.Error!Data,
     };
 
     // Supported operations:
@@ -137,7 +139,7 @@ pub const Parser = struct {
     //    str [.] num -> str
     //    arr [++] arr -> arr
     //    arr [.] num -> Data
-    //    map [.] str -> Data    
+    //    map [.] str -> Data
     const bin_op_list = &[_]BinOpDesc{
         .{ .op = .plus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .minus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
@@ -148,18 +150,18 @@ pub const Parser = struct {
 
         .{ .op = .greater, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .less, .lhs = .num, .rhs = .num, .func = Operation.numOp },
-        .{ .op = .greateql, .lhs = .num, .rhs = .num, .func = Operation.numOp },
-        .{ .op = .lesseql, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .greater_eql, .lhs = .num, .rhs = .num, .func = Operation.numOp },
+        .{ .op = .less_eql, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .equality, .lhs = .num, .rhs = .num, .func = Operation.numOp },
 
         .{ .op = .concat, .lhs = .str, .rhs = .str, .func = Operation.stringOp },
         .{ .op = .equality, .lhs = .str, .rhs = .str, .func = Operation.stringOp },
         .{ .op = .repeat, .lhs = .str, .rhs = .num, .func = Operation.stringOp },
         .{ .op = .dot, .lhs = .str, .rhs = .num, .func = Operation.stringOp },
-        
+
         .{ .op = .concat, .lhs = .array, .rhs = .array, .func = Operation.arrayOp },
         .{ .op = .dot, .lhs = .array, .rhs = .num, .func = Operation.arrayOp },
-        
+
         .{ .op = .dot, .lhs = .map, .rhs = .str, .func = Operation.mapOp },
     };
 
@@ -185,7 +187,7 @@ pub const Parser = struct {
         self.lexer.free();
     }
 
-    fn skipBlock(self: *Self, begin: lex.TokenType, end: lex.TokenType) !void {
+    fn skipBlock(self: *Self, begin: lex.Token.Type, end: lex.Token.Type) !void {
         if (self.token.toktype != begin)
             return self.setErrorContext("Expected block");
 
@@ -200,11 +202,11 @@ pub const Parser = struct {
     }
 
     fn parseReturnValue(self: *Self, source: *Data) Error!Data {
-        if (self.token.toktype != .lbra)
+        if (self.token.toktype != .l_brac)
             return self.setErrorContext("Expected '{'");
         _ = self.advance();
         const ret = try self.parseExpr(source);
-        if (self.token.toktype != .rbra)
+        if (self.token.toktype != .r_brac)
             return self.setErrorContext("Expected '}'");
         _ = self.advance();
         return ret;
@@ -256,14 +258,14 @@ pub const Parser = struct {
 
                 return str;
             },
-            .tru, .fals => {
+            .@"true", .@"false" => {
                 _ = self.advance();
-                return Data{ .name = "", .value = .{ .bool = if (token.toktype == .tru) true else false } };
+                return Data{ .name = "", .value = .{ .bool = if (token.toktype == .@"true") true else false } };
             },
-            .lsqr => {
+            .l_sqr => {
                 _ = self.advance();
                 var arr = Data.initArray("", self.allocator);
-                while (self.token.toktype != .rsqr) {
+                while (self.token.toktype != .r_sqr) {
                     try arr.value.array.append(try self.parseExpr(source));
                     if (self.token.toktype != .comma) {
                         _ = self.advance();
@@ -273,7 +275,7 @@ pub const Parser = struct {
                 }
                 return arr;
             },
-            .lbra => {
+            .l_brac => {
                 _ = self.advance();
                 var obj = try self.parseObject(source);
                 _ = self.advance();
@@ -307,9 +309,9 @@ pub const Parser = struct {
 
                 return val;
             },
-            .iff => {
+            .@"if" => {
                 // TODO: better errors
-                while (self.token.toktype == .iff) {
+                while (self.token.toktype == .@"if") {
                     _ = self.advance();
                     const res = try self.parseParenExpr(source);
                     if (res.value != .bool)
@@ -318,26 +320,26 @@ pub const Parser = struct {
                     const expr = try self.parseReturnValue(source);
                     if (res.value.bool == true) {
                         // Skip else part
-                        while (self.token.toktype == .els) {
+                        while (self.token.toktype == .@"else") {
                             _ = self.advance();
-                            if (self.token.toktype == .iff) {
+                            if (self.token.toktype == .@"if") {
                                 // Skip condition
                                 _ = self.advance();
-                                try self.skipBlock(.lpar, .rpar);
+                                try self.skipBlock(.l_paren, .r_paren);
                             }
 
                             // Skip return block
-                            try self.skipBlock(.lbra, .rbra);
+                            try self.skipBlock(.l_brac, .r_brac);
                         }
                         return expr;
                     }
 
                     // Else part
-                    if (self.token.toktype != .els)
+                    if (self.token.toktype != .@"else")
                         return self.setErrorContext("Expected 'else' after 'if'");
 
                     _ = self.advance();
-                    if (self.token.toktype == .iff)
+                    if (self.token.toktype == .@"if")
                         continue;
 
                     return try self.parseReturnValue(source);
@@ -380,9 +382,9 @@ pub const Parser = struct {
 
     inline fn binOpPrec(self: *Self) isize {
         return switch (self.token.toktype) {
-            .amp, .orop => 8,
+            .amp, .@"or" => 8,
             .equality => 9,
-            .greater, .less, .greateql, .lesseql => 10,
+            .greater, .less, .greater_eql, .less_eql => 10,
             .plus, .concat, .minus => 12,
             .multiply, .repeat, .divide, .floor, .modulo => 13,
             .dot => 15,
@@ -390,7 +392,7 @@ pub const Parser = struct {
         };
     }
 
-    inline fn executeBinOp(self: *Self, op: TokenType, lhs: Data, rhs: Data) !Data {
+    inline fn executeBinOp(self: *Self, op: Token.Type, lhs: Data, rhs: Data) !Data {
         _ = self;
         for (bin_op_list) |bin_op| {
             if (bin_op.op == op and lhs.value == bin_op.lhs and rhs.value == bin_op.rhs) {
@@ -426,7 +428,7 @@ pub const Parser = struct {
             var val = try self.executeBinOp(oper, lhs, rhs);
             lhs.free();
             rhs.free();
-            
+
             lhs = val;
         }
 
@@ -439,11 +441,11 @@ pub const Parser = struct {
     }
 
     fn parseParenExpr(self: *Self, source: *Data) Error!Data {
-        if (self.token.toktype != .lpar)
+        if (self.token.toktype != .l_paren)
             return self.setErrorContext("Expected '('");
         _ = self.advance();
         var res = try self.parseExpr(source);
-        if (self.token.toktype != .rpar)
+        if (self.token.toktype != .r_paren)
             return self.setErrorContext("Expected ')'");
         _ = self.advance();
         return res;
@@ -475,7 +477,7 @@ pub const Parser = struct {
         _ = source; // This parameter exists just for the sake of consistency
         var map = Data.initMap("", self.allocator);
         try self.parseObjectNoscope(&map.value.map, &map);
-        if (self.token.toktype != .rbra)
+        if (self.token.toktype != .r_brac)
             return map;
         return map;
     }
@@ -486,7 +488,7 @@ pub const Parser = struct {
         }
     }
 
-    fn advance(self: *Self) lex.TokenType {
+    fn advance(self: *Self) lex.Token.Type {
         self.token = self.lexer.getToken();
         return self.token.toktype;
     }
