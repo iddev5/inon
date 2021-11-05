@@ -6,6 +6,18 @@ const Token = lex.Token;
 const Data = @import("Data.zig");
 
 const Operation = struct {
+    fn boolOp(op: Token.Type, a: Data, b: Data) !Data {
+        const a_b = a.value.bool;
+        const b_b = b.value.bool;
+        return Data{.name = "", .value = .{ .bool = switch (op) {
+            .amp => a_b and b_b,
+            .@"or" => a_b or b_b,
+            .equality => a_b == b_b,
+            else => unreachable,
+            
+        }} };
+    }
+
     fn numOp(op: Token.Type, a: Data, b: Data) !Data {
         const a_n = a.value.num;
         const b_n = b.value.num;
@@ -141,6 +153,10 @@ pub const Parser = struct {
     //    arr [.] num -> Data
     //    map [.] str -> Data
     const bin_op_list = &[_]BinOpDesc{
+        .{ .op = .amp, .lhs = .bool, .rhs = .bool, .func = Operation.boolOp },
+        .{ .op = .@"or", .lhs = .bool, .rhs = .bool, .func = Operation.boolOp },
+        .{ .op = .equality, .lhs = .bool, .rhs = .bool, .func = Operation.boolOp },
+        
         .{ .op = .plus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .minus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .multiply, .lhs = .num, .rhs = .num, .func = Operation.numOp },
