@@ -3,19 +3,18 @@ const Allocator = std.mem.Allocator;
 
 const Data = @This();
 
-name: []const u8,
 value: union(Type) {
     bool: bool,
     num: f64,
     str: String,
-    array: std.ArrayList(Data),
-    map: std.StringHashMap(Data),
-},
-allocator: *Allocator = undefined,
+    array: Array,
+    map: Map,
+} = undefined,
+allocator: Allocator = undefined,
 
-pub const String = std.ArrayList(u8);
-pub const Array = std.ArrayList(Data);
-pub const Map = std.StringHashMap(Data);
+pub const String = std.ArrayListUnmanaged(u8);
+pub const Array = std.ArrayListUnmanaged(Data);
+pub const Map = std.StringHashMapUnmanaged(Data);
 
 pub const Type = enum(u8) {
     bool,
@@ -25,55 +24,28 @@ pub const Type = enum(u8) {
     map,
 };
 
-pub fn initString(name: []const u8, allocator: Allocator) Data {
-    return .{
-        .name = name,
-        .value = .{ .str = String.init(allocator) },
-        .allocator = allocator,
-    };
-}
-
-pub fn initArray(name: []const u8, allocator: Allocator) Data {
-    return .{
-        .name = name,
-        .value = .{ .array = std.ArrayList(Data).init(allocator) },
-        .allocator = allocator,
-    };
-}
-
-pub fn initMap(name: []const u8, allocator: Allocator) Data {
-    return .{
-        .name = name,
-        .value = .{ .map = std.StringHashMap(Data).init(allocator) },
-        .allocator = allocator,
-    };
-}
-
 pub fn free(self: *Data) void {
     switch (self.value) {
-        .str => self.value.str.deinit(),
+        .str => self.value.str.deinit(self.allocator),
         .array => {
             for (self.value.array.items) |item| {
                 var i = item;
                 i.free();
             }
-            self.value.array.deinit();
+            self.value.array.deinit(self.allocator);
         },
         .map => {
             var iter = self.value.map.valueIterator();
             while (iter.next()) |value| {
                 value.*.free();
             }
-            self.value.map.deinit();
+            self.value.map.deinit(self.allocator);
         },
         else => {},
     }
 }
 
 pub fn get(self: *Data, name: []const u8) !Data {
-    if (std.mem.eql(u8, self.name, name))
-        return self.*;
-
     return switch (self.value) {
         .map => self.value.map.get(name).?,
         else => unreachable,
@@ -95,28 +67,28 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
     switch (self.value) {
         .bool, .num => return self.*,
         .str => {
-            var data = Data.initString("", allocator);
+            var data = Data{ .value = .{ .str = .{} }, .allocator = allocator };
             for (self.value.str.items) |item| {
-                try data.value.str.append(item);
+                try data.value.str.append(allocator, item);
             }
 
             return data;
         },
         .array => {
-            var data = Data.initArray("", allocator);
+            var data = Data{ .value = .{ .array = .{} }, .allocator = allocator };
             for (self.value.array.items) |item| {
-                try data.value.array.append(try item.copy(allocator));
+                try data.value.array.append(allocator, try item.copy(allocator));
             }
 
             return data;
         },
         .map => {
-            var data = Data.initMap("", allocator);
+            var data = Data{ .value = .{ .map = .{} }, .allocator = allocator };
             var iter = self.value.map.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
-                try data.value.map.put(key, try value.copy(allocator));
+                try data.value.map.put(allocator, key, try value.copy(allocator));
             }
 
             return data;
@@ -130,11 +102,6 @@ pub fn serialize(self: *Data, indent: usize, writer: std.fs.File.Writer) std.os.
 }
 
 fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
-    if (!std.mem.eql(u8, self.name, "")) {
-        _ = try writer.writeByteNTimes(' ', indent);
-        try writer.print("{s} = ", .{self.name});
-    }
-
     switch (self.value) {
         .bool => try writer.print("{}", .{self.value.bool}),
         .num => try writer.print("{}", .{self.value.num}),
@@ -161,6 +128,11 @@ fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std
             _ = try writer.write("{\n");
 
             while (iter.next()) |entry| : (id += 1) {
+                // Write key
+                _ = try writer.writeByteNTimes(' ', indent + 4);
+                try writer.print("{s} = ", .{entry.key_ptr.*});
+
+                // Write value
                 try entry.value_ptr.*.serializeInternal(indent + 4, writer);
                 _ = try writer.write(";\n");
             }

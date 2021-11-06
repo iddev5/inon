@@ -9,20 +9,18 @@ const Operation = struct {
     fn boolOp(op: Token.Type, a: Data, b: Data) !Data {
         const a_b = a.value.bool;
         const b_b = b.value.bool;
-        return Data{.name = "", .value = .{ .bool = switch (op) {
+        return Data{ .value = .{ .bool = switch (op) {
             .amp => a_b and b_b,
             .@"or" => a_b or b_b,
             .equality => a_b == b_b,
             else => unreachable,
-            
-        }} };
+        } } };
     }
 
     fn numOp(op: Token.Type, a: Data, b: Data) !Data {
         const a_n = a.value.num;
         const b_n = b.value.num;
         return Data{
-            .name = "",
             .value = switch (op) {
                 // Arithmetic operators
                 .plus => .{ .num = a_n + b_n },
@@ -47,12 +45,12 @@ const Operation = struct {
             switch (op) {
                 .concat => {
                     var ret = try a.copy(a.allocator);
-                    try ret.value.str.appendSlice(b.value.str.items);
+                    try ret.value.str.appendSlice(a.allocator, b.value.str.items);
                     return ret;
                 },
                 .equality => {
                     const res = a.eql(&b);
-                    return Data{ .name = "", .value = .{
+                    return Data{ .value = .{
                         .bool = res,
                     } };
                 },
@@ -67,7 +65,7 @@ const Operation = struct {
 
                     var i: usize = 1;
                     while (i < @floatToInt(usize, b.value.num)) : (i += 1) {
-                        try copy.value.str.appendSlice(slice);
+                        try copy.value.str.appendSlice(a.allocator, slice);
                     }
 
                     return copy;
@@ -76,8 +74,8 @@ const Operation = struct {
                     // TODO: implement char type to prevent allocator
                     // but have it as an implicit string value
                     const ch = a.value.str.items[@floatToInt(u32, b.value.num)];
-                    var copy = Data.initString("", a.allocator);
-                    try copy.value.str.append(ch);
+                    var copy = Data{ .value = .{ .str = .{} }, .allocator = a.allocator };
+                    try copy.value.str.append(a.allocator, ch);
                     return copy;
                 },
                 else => unreachable,
@@ -92,11 +90,11 @@ const Operation = struct {
             switch (op) {
                 .concat => {
                     var copy = try a.copy(a.allocator);
-                    try copy.value.array.ensureTotalCapacity(a.value.array.items.len + b.value.array.items.len);
+                    try copy.value.array.ensureTotalCapacity(a.allocator, a.value.array.items.len + b.value.array.items.len);
 
                     var i: usize = 0;
                     while (i < b.value.array.items.len) : (i += 1)
-                        try copy.value.array.append(try b.value.array.items[i].copy(a.allocator));
+                        try copy.value.array.append(a.allocator, try b.value.array.items[i].copy(a.allocator));
                     return copy;
                 },
                 else => unreachable,
@@ -156,7 +154,7 @@ pub const Parser = struct {
         .{ .op = .amp, .lhs = .bool, .rhs = .bool, .func = Operation.boolOp },
         .{ .op = .@"or", .lhs = .bool, .rhs = .bool, .func = Operation.boolOp },
         .{ .op = .equality, .lhs = .bool, .rhs = .bool, .func = Operation.boolOp },
-        
+
         .{ .op = .plus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .minus, .lhs = .num, .rhs = .num, .func = Operation.numOp },
         .{ .op = .multiply, .lhs = .num, .rhs = .num, .func = Operation.numOp },
@@ -193,7 +191,7 @@ pub const Parser = struct {
     pub fn init(src: []const u8, allocator: Allocator) Self {
         return .{
             .lexer = Lexer.init(src),
-            .global = Data.initMap("global", allocator),
+            .global = Data{ .value = .{ .map = .{} }, .allocator = allocator },
             .token = undefined,
             .allocator = allocator,
         };
@@ -234,16 +232,16 @@ pub const Parser = struct {
             .number => {
                 _ = self.advance();
                 const num = try std.fmt.parseFloat(f64, token.content);
-                return Data{ .name = "", .value = .{ .num = num } };
+                return Data{ .value = .{ .num = num } };
             },
             .string => {
                 _ = self.advance();
-                var str = Data.initString("", self.allocator);
+                var str = Data{ .value = .{ .str = .{} }, .allocator = self.allocator };
 
                 // Handle escape sequence in strings
                 var index: usize = 0;
                 while (index < token.content.len) : (index += 1) {
-                    try str.value.str.append(if (token.content[index] == '\\' and index + 1 < token.content.len) blk: {
+                    try str.value.str.append(self.allocator, if (token.content[index] == '\\' and index + 1 < token.content.len) blk: {
                         index += 1;
                         break :blk switch (token.content[index]) {
                             'r' => '\r',
@@ -261,13 +259,13 @@ pub const Parser = struct {
             },
             .raw_string => {
                 _ = self.advance();
-                var str = Data.initString("", self.allocator);
+                var str = Data{ .value = .{ .str = .{} }, .allocator = self.allocator };
 
-                try str.value.str.appendSlice(token.content);
+                try str.value.str.appendSlice(self.allocator, token.content);
 
                 // Multi line string concat
                 while (self.token.toktype == .raw_string) {
-                    try str.value.str.appendSlice(self.token.content);
+                    try str.value.str.appendSlice(self.allocator, self.token.content);
                     _ = self.advance();
                 }
                 _ = str.value.str.pop();
@@ -276,13 +274,13 @@ pub const Parser = struct {
             },
             .@"true", .@"false" => {
                 _ = self.advance();
-                return Data{ .name = "", .value = .{ .bool = if (token.toktype == .@"true") true else false } };
+                return Data{ .value = .{ .bool = if (token.toktype == .@"true") true else false } };
             },
             .l_sqr => {
                 _ = self.advance();
-                var arr = Data.initArray("", self.allocator);
+                var arr = Data{ .value = .{ .array = .{} }, .allocator = self.allocator };
                 while (self.token.toktype != .r_sqr) {
-                    try arr.value.array.append(try self.parseExpr(source));
+                    try arr.value.array.append(self.allocator, try self.parseExpr(source));
                     if (self.token.toktype != .comma) {
                         _ = self.advance();
                         return arr;
@@ -475,9 +473,8 @@ pub const Parser = struct {
                 .assignment => {
                     _ = self.advance();
                     var val = try self.parseExpr(source);
-                    val.name = key;
 
-                    try map.put(key, val);
+                    try map.put(self.allocator, key, val);
 
                     if (self.token.toktype != .semicolon)
                         return self.setErrorContext("Expected ';' at the end of statement");
@@ -491,7 +488,7 @@ pub const Parser = struct {
 
     inline fn parseObject(self: *Self, source: *Data) Error!Data {
         _ = source; // This parameter exists just for the sake of consistency
-        var map = Data.initMap("", self.allocator);
+        var map = Data{ .value = .{ .map = .{} }, .allocator = self.allocator };
         try self.parseObjectNoscope(&map.value.map, &map);
         if (self.token.toktype != .r_brac)
             return map;
