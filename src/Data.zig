@@ -45,6 +45,20 @@ pub fn free(self: *Data) void {
     }
 }
 
+pub fn is(self: *Data, t: Type) bool {
+    return self.value == t;
+}
+
+pub fn get(self: *Data, comptime t: Type) switch (t) {
+    .bool => bool,
+    .num => f64,
+    .str => String,
+    .array => Array,
+    .map => Map,
+} {
+    return @field(self.value, @tagName(t));
+}
+
 pub fn find(self: *Data, name: []const u8) !Data {
     return switch (self.value) {
         .map => self.value.map.get(name).?,
