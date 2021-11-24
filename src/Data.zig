@@ -45,7 +45,7 @@ pub fn free(self: *Data) void {
     }
 }
 
-pub fn get(self: *Data, name: []const u8) !Data {
+pub fn find(self: *Data, name: []const u8) !Data {
     return switch (self.value) {
         .map => self.value.map.get(name).?,
         else => unreachable,

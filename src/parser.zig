@@ -540,7 +540,7 @@ test "basic test" {
     try parser.parse();
     defer parser.global.free();
 
-    try expectEqual(@as(f64, 10), (try parser.global.get("num")).value.num);
-    try expectEqualStrings("string", (try parser.global.get("str")).value.str.items);
-    try expectEqualStrings("multi-lined\n raw_string", (try parser.global.get("raw_str")).value.str.items);
+    try expectEqual(@as(f64, 10), (try parser.global.find("num")).value.num);
+    try expectEqualStrings("string", (try parser.global.find("str")).value.str.items);
+    try expectEqualStrings("multi-lined\n raw_string", (try parser.global.find("raw_str")).value.str.items);
 }
