@@ -5,12 +5,12 @@ pub const Parser = parse.Parser;
 const Data = @import("data.zig").Data;
 
 pub const Inon = struct {
-    allocator: *Allocator,
+    allocator: Allocator,
     parser: Parser = undefined,
 
     const Self = @This();
 
-    pub fn init(allocator: *Allocator) Self {
+    pub fn init(allocator: Allocator) Self {
         return .{
             .allocator = allocator,
         };

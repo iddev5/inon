@@ -10,7 +10,7 @@ pub const Parser = struct {
     lexer: Lexer,
     token: Token,
     global: Data,
-    allocator: *Allocator,
+    allocator: Allocator,
     error_context: ?ErrorContext = null,
 
     const Self = @This();
@@ -22,7 +22,7 @@ pub const Parser = struct {
 
     pub const Error = Allocator.Error || std.fmt.ParseFloatError || error{ParseError};
 
-    pub fn init(src: []const u8, allocator: *Allocator) Self {
+    pub fn init(src: []const u8, allocator: Allocator) Self {
         return .{
             .lexer = Lexer.init(src),
             .global = Data.initMap("global", allocator),

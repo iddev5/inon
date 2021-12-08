@@ -20,21 +20,21 @@ pub const Data = struct {
 
     const Self = @This();
 
-    pub fn initString(name: []const u8, allocator: *Allocator) Self {
+    pub fn initString(name: []const u8, allocator: Allocator) Self {
         return .{
             .name = name,
             .value = .{ .str = String.init(allocator) },
         };
     }
 
-    pub fn initArray(name: []const u8, allocator: *Allocator) Self {
+    pub fn initArray(name: []const u8, allocator: Allocator) Self {
         return .{
             .name = name,
             .value = .{ .arr = std.ArrayList(Data).init(allocator) },
         };
     }
 
-    pub fn initMap(name: []const u8, allocator: *Allocator) Self {
+    pub fn initMap(name: []const u8, allocator: Allocator) Self {
         return .{
             .name = name,
             .value = .{ .map = std.StringHashMap(Data).init(allocator) },
@@ -83,7 +83,7 @@ pub const Data = struct {
         };
     }
 
-    pub fn makeCopy(self: *const Self, allocator: *Allocator) Allocator.Error!Self {
+    pub fn makeCopy(self: *const Self, allocator: Allocator) Allocator.Error!Self {
         switch (self.value) {
             .boo, .num => return self.*,
             .str => {

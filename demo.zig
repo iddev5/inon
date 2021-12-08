@@ -4,7 +4,7 @@ const ParseError = @import("src/lib.zig").Parser.ParseError;
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = &gpa.allocator;
+    const allocator = gpa.allocator();
 
     const stdout = std.io.getStdOut().writer();
 
