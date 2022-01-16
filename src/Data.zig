@@ -64,7 +64,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     return @field(self.value, @tagName(t));
 }
 
-pub fn find(self: *const Data, name: []const u8) !Data {
+pub fn find(self: *const Data, name: []const u8) Data {
     return switch (self.value) {
         .map => if (self.value.map.get(name)) |data| data else Data.null_data,
         else => unreachable,
