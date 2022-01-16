@@ -28,20 +28,20 @@ pub const Type = enum(u8) {
 
 pub const null_data = Data{ .value = .{ .nulled = .{} } };
 
-pub fn free(self: *Data) void {
+pub fn deinit(self: *Data) void {
     switch (self.value) {
         .str => self.value.str.deinit(self.allocator),
         .array => {
             for (self.value.array.items) |item| {
                 var i = item;
-                i.free();
+                i.deinit();
             }
             self.value.array.deinit(self.allocator);
         },
         .map => {
             var iter = self.value.map.valueIterator();
             while (iter.next()) |value| {
-                value.*.free();
+                value.*.deinit();
             }
             self.value.map.deinit(self.allocator);
         },
@@ -64,7 +64,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     return @field(self.value, @tagName(t));
 }
 
-pub fn find(self: *Data, name: []const u8) !Data {
+pub fn find(self: *const Data, name: []const u8) !Data {
     return switch (self.value) {
         .map => if (self.value.map.get(name)) |data| data else Data.null_data,
         else => unreachable,
