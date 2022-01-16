@@ -9,6 +9,7 @@ value: union(Type) {
     str: String,
     array: Array,
     map: Map,
+    nulled: void,
 } = undefined,
 allocator: Allocator = undefined,
 
@@ -22,6 +23,7 @@ pub const Type = enum(u8) {
     str,
     array,
     map,
+    nulled,
 };
 
 pub fn free(self: *Data) void {
@@ -45,16 +47,17 @@ pub fn free(self: *Data) void {
     }
 }
 
-pub fn is(self: *Data, t: Type) bool {
+pub fn is(self: *const Data, t: Type) bool {
     return self.value == t;
 }
 
-pub fn get(self: *Data, comptime t: Type) switch (t) {
+pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .bool => bool,
     .num => f64,
     .str => String,
     .array => Array,
     .map => Map,
+    .nulled => @compileError("cannot use Data.get(.void)"),
 } {
     return @field(self.value, @tagName(t));
 }
@@ -74,12 +77,13 @@ pub fn eql(self: *const Data, data: *const Data) bool {
         .str => std.mem.eql(u8, self.value.str.items, data.value.str.items),
         .array => false, // TODO
         .map => false, // TODO
+        .nulled => true,
     };
 }
 
 pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
     switch (self.value) {
-        .bool, .num => return self.*,
+        .bool, .num, .nulled => return self.*,
         .str => {
             var data = Data{ .value = .{ .str = .{} }, .allocator = allocator };
             for (self.value.str.items) |item| {
@@ -119,6 +123,7 @@ fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std
     switch (self.value) {
         .bool => try writer.print("{}", .{self.value.bool}),
         .num => try writer.print("{}", .{self.value.num}),
+        .nulled => try writer.writeAll("null"),
         .str => try writer.print("\"{s}\"", .{self.value.str.items}),
         .array => {
             const arr = self.value.array;
