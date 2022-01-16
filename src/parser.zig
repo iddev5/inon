@@ -538,9 +538,9 @@ test "basic test" {
     , allocator);
     defer parser.free();
     try parser.parse();
-    defer parser.global.free();
+    defer parser.global.deinit();
 
-    try expectEqual(@as(f64, 10), (try parser.global.find("num")).value.num);
-    try expectEqualStrings("string", (try parser.global.find("str")).value.str.items);
-    try expectEqualStrings("multi-lined\n raw_string", (try parser.global.find("raw_str")).value.str.items);
+    try expectEqual(@as(f64, 10), (parser.global.find("num")).value.num);
+    try expectEqualStrings("string", (parser.global.find("str")).value.str.items);
+    try expectEqualStrings("multi-lined\n raw_string", (parser.global.find("raw_str")).value.str.items);
 }
