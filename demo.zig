@@ -37,7 +37,7 @@ pub fn main() anyerror!void {
         },
         else => |e| return e,
     };
-    defer data.free();
+    defer data.deinit();
 
     try stdout.print("Deserialized: \n\n", .{});
     try stdout.print("{s}\n\n", .{@TypeOf(data.value.map)});

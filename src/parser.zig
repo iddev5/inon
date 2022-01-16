@@ -60,7 +60,7 @@ const Operation = struct {
             switch (op) {
                 .repeat => {
                     var copy = try a.copy(a.allocator);
-                    errdefer copy.free();
+                    errdefer copy.deinit();
                     const slice = a.value.str.items;
 
                     var i: usize = 1;
@@ -440,8 +440,8 @@ pub const Parser = struct {
             }
 
             var val = try self.executeBinOp(oper, lhs, rhs);
-            lhs.free();
-            rhs.free();
+            lhs.deinit();
+            rhs.deinit();
 
             lhs = val;
         }
