@@ -59,7 +59,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .str => String,
     .array => Array,
     .map => Map,
-    .nulled => @compileError("cannot use Data.get(.void)"),
+    .nulled => @compileError("cannot use Data.get(.nulled)"),
 } {
     return @field(self.value, @tagName(t));
 }
