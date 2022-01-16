@@ -26,6 +26,8 @@ pub const Type = enum(u8) {
     nulled,
 };
 
+pub const null_data = Data{ .value = .{ .nulled = .{} } };
+
 pub fn free(self: *Data) void {
     switch (self.value) {
         .str => self.value.str.deinit(self.allocator),
@@ -64,7 +66,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
 
 pub fn find(self: *Data, name: []const u8) !Data {
     return switch (self.value) {
-        .map => self.value.map.get(name).?,
+        .map => if (self.value.map.get(name)) |data| data else Data.null_data,
         else => unreachable,
     };
 }
