@@ -1,14 +1,19 @@
 pkgs:
   inon:
     version: 0.1.0
-    description: "Data serialization format in Zig"
+    description: Data serialization format in Zig
     license: MIT
     source_url: "https://github.com/iddev5/inon"
     tags:
       data-format
       serialization
-
     root: src/lib.zig
     files:
       README.md
       LICENSE
+deps:
+  parser-toolkit:
+    git:
+      url: "https://github.com/MasterQ32/parser-toolkit.git"
+      ref: master
+      root: src/main.zig
