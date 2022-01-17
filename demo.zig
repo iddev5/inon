@@ -39,7 +39,7 @@ pub fn main() anyerror!void {
     try stdout.print("{s}\n\n", .{@TypeOf(data.value.map)});
 
     try stdout.print("Serialized: \n\n", .{});
-    try data.serialize(0, stdout);
+    try inon.serialize(&data, stdout);
 
     std.log.info("All your config files are belong to us.", .{});
 }

@@ -54,6 +54,11 @@ pub fn parse(inon: *Inon, src: []const u8) !Data {
     return result;
 }
 
+pub fn serialize(inon: *Inon, data: *Data, writer: anytype) !void {
+    _ = inon;
+    try data.serialize(4, writer);
+}
+
 pub fn renderError(inon: *Inon, writer: anytype) !void {
     const loc = inon.message.?.location;
     const msg = inon.message.?.message;

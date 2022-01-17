@@ -122,11 +122,11 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
 }
 
 pub fn serialize(self: *Data, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
-    try self.serializeInternal(indent, writer);
+    try self.serializeInternal(0, indent, writer);
     try writer.print(";\n", .{});
 }
 
-fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
+fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
     switch (self.value) {
         .bool => try writer.print("{}", .{self.value.bool}),
         .num => try writer.print("{}", .{self.value.num}),
@@ -139,7 +139,7 @@ fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std
             _ = try writer.write("[");
 
             while (id < arr.items.len) : (id += 1) {
-                try arr.items[id].serializeInternal(indent, writer);
+                try arr.items[id].serializeInternal(start, indent, writer);
                 if (id != arr.items.len - 1)
                     _ = try writer.write(", ");
             }
@@ -159,15 +159,15 @@ fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std
                     continue;
 
                 // Write key
-                _ = try writer.writeByteNTimes(' ', indent + 4);
+                _ = try writer.writeByteNTimes(' ', start + indent);
                 try writer.print("{s} = ", .{key});
 
                 // Write value
-                try entry.value_ptr.*.serializeInternal(indent + 4, writer);
+                try entry.value_ptr.*.serializeInternal(start + indent, indent, writer);
                 _ = try writer.write(";\n");
             }
 
-            _ = try writer.writeByteNTimes(' ', indent);
+            _ = try writer.writeByteNTimes(' ', start);
             _ = try writer.write("}");
         },
     }
