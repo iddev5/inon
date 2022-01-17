@@ -1,3 +1,3 @@
 comptime {
-    _ = @import("parser.zig");
+    _ = @import("main.zig");
 }
