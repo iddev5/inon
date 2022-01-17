@@ -64,11 +64,16 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     return @field(self.value, @tagName(t));
 }
 
-pub fn find(self: *const Data, name: []const u8) Data {
+pub fn findEx(self: *const Data, name: []const u8) Data {
     return switch (self.value) {
         .map => if (self.value.map.get(name)) |data| data else Data.null_data,
         else => unreachable,
     };
+}
+
+pub fn find(self: *const Data, name: []const u8) Data {
+    if (std.mem.startsWith(u8, name, "_")) return Data.null_data;
+    return self.findEx(name);
 }
 
 // Unsafe, check for matching tags separately
@@ -149,9 +154,13 @@ fn serializeInternal(self: *Data, indent: usize, writer: std.fs.File.Writer) std
             _ = try writer.write("{\n");
 
             while (iter.next()) |entry| : (id += 1) {
+                const key = entry.key_ptr.*;
+                if (std.mem.startsWith(u8, key, "_"))
+                    continue;
+
                 // Write key
                 _ = try writer.writeByteNTimes(' ', indent + 4);
-                try writer.print("{s} = ", .{entry.key_ptr.*});
+                try writer.print("{s} = ", .{key});
 
                 // Write value
                 try entry.value_ptr.*.serializeInternal(indent + 4, writer);
