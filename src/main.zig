@@ -22,9 +22,9 @@ const Message = struct {
     }
 };
 
-const InonError = mem.Allocator.Error;
+const Error = mem.Allocator.Error;
 
-pub const FuncFnType = fn (inon: *Inon, params: []Data) InonError!Data;
+pub const FuncFnType = fn (inon: *Inon, params: []Data) Error!Data;
 pub const FuncType = struct {
     name: []const u8,
     params: []const ?Data.Type,
@@ -119,7 +119,7 @@ const Parser = struct {
 
     const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
-    pub fn parse(expression: []const u8, inon: *Inon) Error!Data {
+    pub fn parse(expression: []const u8, inon: *Inon) ParseError!Data {
         var tokenizer = Tokenizer.init(expression);
 
         var parser = Parser{
@@ -154,7 +154,7 @@ const Parser = struct {
     const is_rsqr = ruleset.is(.@"]");
     const is_minus = ruleset.is(.@"-");
 
-    const Error = mem.Allocator.Error || ParserCore.Error || error{ParsingFailed};
+    const ParseError = mem.Allocator.Error || ParserCore.Error || error{ParsingFailed};
 
     fn peek(self: *Self) !?Tokenizer.Token {
         return self.core.peek() catch |err| switch (err) {
@@ -175,7 +175,7 @@ const Parser = struct {
         };
     }
 
-    fn acceptAssignment(self: *Self) Error!Data {
+    fn acceptAssignment(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -183,7 +183,7 @@ const Parser = struct {
         return try acceptAtom(self);
     }
 
-    fn acceptTopLevelExpr(self: *Self, context: *Data) Error!void {
+    fn acceptTopLevelExpr(self: *Self, context: *Data) ParseError!void {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -245,7 +245,7 @@ const Parser = struct {
         try context.value.map.put(self.inon.allocator, identifier, val);
     }
 
-    fn acceptObjectNoCtx(self: *Self, context: *Data) Error!Data {
+    fn acceptObjectNoCtx(self: *Self, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -256,7 +256,7 @@ const Parser = struct {
         return context.*;
     }
 
-    fn acceptObject(self: *Self) Error!Data {
+    fn acceptObject(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -277,7 +277,7 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptAtom(self: *Self) Error!Data {
+    fn acceptAtom(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -328,7 +328,7 @@ const Parser = struct {
         } };
     }
 
-    fn acceptAtomIdentifier(self: *Self) Error!Data {
+    fn acceptAtomIdentifier(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -342,7 +342,7 @@ const Parser = struct {
         return data.copy(self.inon.allocator);
     }
 
-    fn acceptAtomString(self: *Self) Error!Data {
+    fn acceptAtomString(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -388,7 +388,7 @@ const Parser = struct {
         return str;
     }
 
-    fn acceptAtomList(self: *Self) Error!Data {
+    fn acceptAtomList(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -420,7 +420,7 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptFunctionCall(self: *Self) Error!Data {
+    fn acceptFunctionCall(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
