@@ -28,6 +28,8 @@ pub fn build(b: *std.build.Builder) void {
     run_step.dependOn(&run_cmd.step);
 
     const tests = b.addTest("src/test.zig");
+    deps.pkgs.addAllTo(tests);
+
     const tests_step = b.step("test", "Run tests");
     tests_step.dependOn(&tests.step);
 }
