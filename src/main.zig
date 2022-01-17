@@ -42,21 +42,21 @@ pub fn init(allocator: Allocator) Inon {
     };
 }
 
-pub fn deinit(self: *Inon) void {
-    if (self.message) |message| message.free(self.allocator);
-    self.functions.deinit(self.allocator);
-    self.context.deinit();
+pub fn deinit(inon: *Inon) void {
+    if (inon.message) |message| message.free(inon.allocator);
+    inon.functions.deinit(inon.allocator);
+    inon.context.deinit();
 }
 
-pub fn parse(self: *Inon, src: []const u8) !Data {
-    var result = try Parser.parse(src, self);
+pub fn parse(inon: *Inon, src: []const u8) !Data {
+    var result = try Parser.parse(src, inon);
     errdefer result.free();
     return result;
 }
 
-pub fn renderError(self: *Inon, writer: anytype) !void {
-    const loc = self.message.?.location;
-    const msg = self.message.?.message;
+pub fn renderError(inon: *Inon, writer: anytype) !void {
+    const loc = inon.message.?.location;
+    const msg = inon.message.?.message;
     try writer.print(
         "{s}:{}:{} error: {s}\n",
         .{ loc.source, loc.line, loc.column, msg },
