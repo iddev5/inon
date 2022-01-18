@@ -10,6 +10,13 @@ const Lib = struct {
         return Data{ .value = .{ .num = data1.get(.num) + data2.get(.num) } };
     }
 
+    fn mul(inon: *Inon, params: []Data) !Data {
+        _ = inon;
+        const data1 = params[0];
+        const data2 = params[1];
+        return Data{ .value = .{ .num = data1.get(.num) * data2.get(.num) } };
+    }
+
     fn find(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
         const data2 = params[1];
@@ -34,6 +41,7 @@ const Lib = struct {
 pub fn addAll(inon: *Inon) !void {
     const functions: []const Inon.FuncType = &.{
         .{ .name = "+", .params = &.{ .num, .num }, .run = Lib.add },
+        .{ .name = "*", .params = &.{ .num, .num }, .run = Lib.mul },
         .{ .name = "find", .params = &.{ null, .str }, .run = Lib.find },
         .{ .name = "self", .params = &.{.str}, .run = Lib.self },
         .{ .name = "=", .params = &.{ null, null }, .run = Lib.eql },
