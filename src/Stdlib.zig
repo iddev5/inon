@@ -1,4 +1,6 @@
+const std = @import("std");
 const Inon = @import("main.zig");
+const Data = @import("Data.zig");
 
 const Lib = struct {
     fn add(inon: *Inon, params: []Data) !Data {
@@ -38,6 +40,6 @@ pub fn addAll(inon: *Inon) !void {
     };
 
     for (functions) |f| {
-        try inon.functions.put(allocator, f.name, f);
+        try inon.functions.put(inon.allocator, f.name, f);
     }
 }
