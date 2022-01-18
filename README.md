@@ -2,20 +2,25 @@
 Data serialization format in Zig
 
 - Simple human-readable data serialization format
-- Expression evaluation capabilties
+- Host function execution capabilties
 - Operates on Zig's standard types
 - Fast serialization and deserialization
 
 # Example file
 ```
-first_name = "joe";
-last_name = "something";
-age = 30;
-address = {
-    street_no = 420;
-    city = "nyc";
-};
-phone_nos = [100, 200, 300];
+first_name : "joe"
+last_name : "something"
+age : 50
+address: {
+    street_no :: ('= age 30) : 420
+    street_no :: ('= age 40) : 40
+    street_no :: ('= age 50) : 50
+    street_no ?: 60
+    num : ('* (self "street_no") 2)
+    city : "nyc"
+}
+phone_nos : [100, 200, 300]
+second_no : (index phone_nos 1)
 ```
 
 See [``demo.zig``](demo.zig) file for integration example.
