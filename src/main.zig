@@ -106,7 +106,7 @@ const Parser = struct {
         Pattern.create(.@"true", matchers.literal("true")),
         Pattern.create(.@"false", matchers.literal("false")),
         Pattern.create(.@"null", matchers.literal("null")),
-        Pattern.create(.identifier, matchers.identifier),
+        Pattern.create(.identifier, identifierMatcher),
         Pattern.create(.identifier, anyNameMatcher),
         Pattern.create(.whitespace, matchers.takeAnyOf(" \n\r\t")),
         Pattern.create(.comment, commentMatcher),
@@ -512,6 +512,17 @@ fn stringMatcher(str: []const u8) ?usize {
     }
 
     return i;
+}
+
+fn identifierMatcher(str: []const u8) ?usize {
+    const first_char = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const all_chars = first_char ++ "-0123456789";
+    for (str) |c, i| {
+        if (std.mem.indexOfScalar(u8, if (i > 0) all_chars else first_char, c) == null) {
+            return i;
+        }
+    }
+    return str.len;
 }
 
 fn anyNameMatcher(str: []const u8) ?usize {
