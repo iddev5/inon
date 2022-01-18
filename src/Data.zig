@@ -123,7 +123,7 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
 
 pub fn serialize(self: *Data, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
     try self.serializeInternal(0, indent, writer);
-    try writer.print(";\n", .{});
+    try writer.print("\n", .{});
 }
 
 fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.File.Writer) std.os.WriteError!void {
@@ -160,11 +160,11 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
 
                 // Write key
                 _ = try writer.writeByteNTimes(' ', start + indent);
-                try writer.print("{s} = ", .{key});
+                try writer.print("{s} : ", .{key});
 
                 // Write value
                 try entry.value_ptr.*.serializeInternal(start + indent, indent, writer);
-                _ = try writer.write(";\n");
+                _ = try writer.write("\n");
             }
 
             _ = try writer.writeByteNTimes(' ', start);
