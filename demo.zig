@@ -11,6 +11,8 @@ pub fn main() anyerror!void {
     var inon = Inon.init(allocator);
     defer inon.deinit();
 
+    try Inon.Stdlib.addAll(inon);
+
     var data = inon.parse(
         \\first_name: "joe"
         \\last_name: "something"

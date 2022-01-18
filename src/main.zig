@@ -4,6 +4,7 @@ const allocPrint = std.fmt.allocPrint;
 const Allocator = mem.Allocator;
 const Data = @import("Data.zig");
 const ptk = @import("parser-toolkit");
+pub const Stdlib = @import("Stdlib.zig");
 
 const Inon = @This();
 
