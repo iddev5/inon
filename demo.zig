@@ -11,25 +11,20 @@ pub fn main() anyerror!void {
     var inon = Inon.init(allocator);
     defer inon.deinit();
 
-    try Inon.Stdlib.addAll(inon);
+    try Inon.Stdlib.addAll(&inon);
 
     var data = inon.parse(
         \\first_name: "joe"
         \\last_name: "something"
         \\age: 50
-        // \\address = {
-        // \\    street_no =
-        // \\        if (age == 30)
-        // \\            { 420 }
-        // \\        else if (age == 40)
-        // \\            { 40 }
-        // \\        else if (age == 50)
-        // \\            { 50 }
-        // \\        else
-        // \\            { 60 };
+        \\address: {
+        \\    street_no :: ('= age 30) : 420
+        \\    street_no :: ('= age 40) : 40
+        \\    street_no :: ('= age 50) : 50
+        \\    street_no ?: 60
         // \\    num = self.street_no * 2;
-        // \\    city = "nyc";
-        // \\};
+        \\    city : "nyc"
+        \\}
         \\phone_nos: [100, 200, 300]
         // \\second_no = phone_nos.1;
     ) catch |err| switch (err) {
