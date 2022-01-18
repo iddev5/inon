@@ -230,8 +230,10 @@ const Parser = struct {
                     _ = try self.core.accept(is_optcolon);
                     var value = try self.acceptAtom();
 
-                    if (prev_exists)
+                    if (prev_exists) {
                         value.deinit();
+                        return;
+                    }
 
                     break :blk value;
                 } else if (is_colon(token.type)) {
