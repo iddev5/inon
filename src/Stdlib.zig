@@ -54,7 +54,7 @@ pub fn addAll(inon: *Inon) !void {
         .{ .name = "*", .params = &.{ .num, .num }, .run = Lib.mul },
         .{ .name = "find", .params = &.{ null, .str }, .run = Lib.find },
         .{ .name = "self", .params = &.{.str}, .run = Lib.self },
-        .{ .name = "index", .params = &.{ .array, .num }, .run = Lib.index },
+        .{ .name = "index", .params = &.{ null, .num }, .run = Lib.index },
         .{ .name = "=", .params = &.{ null, null }, .run = Lib.eql },
     };
 

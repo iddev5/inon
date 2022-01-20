@@ -78,6 +78,12 @@ pub fn find(self: *const Data, name: []const u8) Data {
 
 pub fn index(self: *const Data, in: usize) !Data {
     return switch (self.value) {
+        .str => blk: {
+            if (in > self.get(.str).items.len) break :blk Data.null_data;
+            var data = Data{ .value = .{ .str = .{} }, .allocator = self.allocator };
+            try data.value.str.append(data.allocator, self.get(.str).items[in]);
+            break :blk data;
+        },
         .array => blk: {
             if (in > self.get(.array).items.len) break :blk Data.null_data;
             break :blk try self.get(.array).items[in].copy(self.allocator);
