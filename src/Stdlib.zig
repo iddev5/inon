@@ -29,15 +29,13 @@ const Lib = struct {
     }
 
     fn index(inon: *Inon, params: []Data) !Data {
+        _ = inon;
         const data1 = params[0];
         const data2 = params[1];
 
         const n = @floatToInt(usize, data2.get(.num));
 
-        if (n >= data1.get(.array).items.len)
-            return Data.null_data;
-
-        return data1.get(.array).items[n].copy(inon.allocator);
+        return try data1.index(n);
     }
 
     fn eql(_: *Inon, params: []Data) !Data {

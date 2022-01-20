@@ -76,6 +76,16 @@ pub fn find(self: *const Data, name: []const u8) Data {
     return self.findEx(name);
 }
 
+pub fn index(self: *const Data, in: usize) !Data {
+    return switch (self.value) {
+        .array => blk: {
+            if (in > self.get(.array).items.len) break :blk Data.null_data;
+            break :blk try self.get(.array).items[in].copy(self.allocator);
+        },
+        else => unreachable,
+    };
+}
+
 // Unsafe, check for matching tags separately
 pub fn eql(self: *const Data, data: *const Data) bool {
     return switch (self.value) {
