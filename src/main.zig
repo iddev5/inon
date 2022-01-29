@@ -2,8 +2,8 @@ const std = @import("std");
 const mem = std.mem;
 const allocPrint = std.fmt.allocPrint;
 const Allocator = mem.Allocator;
-const Data = @import("Data.zig");
 const ptk = @import("parser-toolkit");
+pub const Data = @import("Data.zig");
 pub const Stdlib = @import("Stdlib.zig");
 
 const Inon = @This();
