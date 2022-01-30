@@ -37,5 +37,5 @@ jobs:
               run: gyro build
             - name: Run demo
               run: gyro build run
-            # - name: Test
-            #  run: gyro build test
+            - name: Test
+              run: gyro build test
