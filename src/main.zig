@@ -106,7 +106,6 @@ const Parser = struct {
         Pattern.create(.@"true", matchers.literal("true")),
         Pattern.create(.@"false", matchers.literal("false")),
         Pattern.create(.@"null", matchers.literal("null")),
-        Pattern.create(.identifier, identifierMatcher),
         Pattern.create(.whitespace, matchers.takeAnyOf(" \n\r\t")),
         Pattern.create(.comment, commentMatcher),
         Pattern.create(.@"::", matchers.literal("::")),
@@ -120,6 +119,7 @@ const Parser = struct {
         Pattern.create(.@"}", matchers.literal("}")),
         Pattern.create(.@",", matchers.literal(",")),
         Pattern.create(.@"-", matchers.literal("-")),
+        Pattern.create(.identifier, identifierMatcher),
     });
 
     const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
