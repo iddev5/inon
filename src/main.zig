@@ -126,7 +126,7 @@ const Parser = struct {
     const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
     pub fn parse(expression: []const u8, inon: *Inon) ParseError!Data {
-        var tokenizer = Tokenizer.init(expression);
+        var tokenizer = Tokenizer.init(expression, null);
 
         var parser = Parser{
             .core = ParserCore.init(&tokenizer),
