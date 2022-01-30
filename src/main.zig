@@ -1,6 +1,5 @@
 const std = @import("std");
 const mem = std.mem;
-const allocPrint = std.fmt.allocPrint;
 const Allocator = mem.Allocator;
 const ptk = @import("parser-toolkit");
 pub const Data = @import("Data.zig");
@@ -12,7 +11,7 @@ allocator: Allocator,
 functions: FuncList,
 context: Data,
 current_context: *Data,
-message: ?Message,
+diagnostics: ptk.Diagnostics,
 
 const Message = struct {
     location: ptk.Location,
@@ -36,7 +35,7 @@ pub const FuncList = std.StringArrayHashMapUnmanaged(FuncType);
 pub fn init(allocator: Allocator) Inon {
     return .{
         .allocator = allocator,
-        .message = null,
+        .diagnostics = ptk.Diagnostics.init(allocator),
         .functions = .{},
         .context = .{ .value = .{ .map = .{} }, .allocator = allocator },
         .current_context = undefined,
@@ -44,7 +43,7 @@ pub fn init(allocator: Allocator) Inon {
 }
 
 pub fn deinit(inon: *Inon) void {
-    if (inon.message) |message| message.free(inon.allocator);
+    inon.diagnostics.deinit();
     inon.functions.deinit(inon.allocator);
     inon.context.deinit();
 }
@@ -61,12 +60,7 @@ pub fn serialize(inon: *Inon, data: *Data, writer: anytype) !void {
 }
 
 pub fn renderError(inon: *Inon, writer: anytype) !void {
-    const loc = inon.message.?.location;
-    const msg = inon.message.?.message;
-    try writer.print(
-        "{s}:{}:{} error: {s}\n",
-        .{ loc.source, loc.line, loc.column, msg },
-    );
+    try inon.diagnostics.print(writer);
 }
 
 const matchers = ptk.matchers;
@@ -181,10 +175,7 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        self.inon.message = .{
-            .location = state.location,
-            .message = try allocPrint(self.inon.allocator, format, args),
-        };
+        try self.inon.diagnostics.emit(state.location, .@"error", format, args);
     }
 
     fn acceptAssignment(self: *Self) ParseError!Data {
