@@ -12,11 +12,11 @@ first_name : "joe"
 last_name : "something"
 age : 50
 address: {
-    street_no :: ('= age 30) : 420
-    street_no :: ('= age 40) : 40
-    street_no :: ('= age 50) : 50
+    street_no :: (= age 30) : 420
+    street_no :: (= age 40) : 40
+    street_no :: (= age 50) : 50
     street_no ?: 60
-    num : ('* (self "street_no") 2)
+    num : (* (self "street_no") 2)
     city : "nyc"
 }
 phone_nos : [100, 200, 300]
