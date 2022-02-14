@@ -100,8 +100,7 @@ const Parser = struct {
     const Pattern = ptk.Pattern(TokenType);
 
     const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
-        Pattern.create(.number, matchers.sequenceOf(.{ matchers.decimalNumber, matchers.literal("."), matchers.decimalNumber })),
-        Pattern.create(.number, matchers.decimalNumber),
+        Pattern.create(.number, decimalMatcher),
         Pattern.create(.string, stringMatcher),
         Pattern.create(.@"true", matchers.literal("true")),
         Pattern.create(.@"false", matchers.literal("false")),
@@ -157,7 +156,6 @@ const Parser = struct {
     const is_comma = ruleset.is(.@",");
     const is_lsqr = ruleset.is(.@"[");
     const is_rsqr = ruleset.is(.@"]");
-    const is_minus = ruleset.is(.@"-");
 
     const ParseError = mem.Allocator.Error || ParserCore.Error || error{ParsingFailed};
 
@@ -291,11 +289,6 @@ const Parser = struct {
         if (try self.peek()) |token| {
             if (is_number(token.type)) {
                 return self.acceptAtomNumber();
-            } else if (is_minus(token.type)) {
-                _ = try self.core.accept(is_minus);
-                var num = try self.acceptAtomNumber();
-                num.value.num = -num.value.num;
-                return num;
             } else if (is_identifier(token.type)) {
                 return self.acceptAtomIdentifier();
             } else if (is_string(token.type)) {
@@ -491,6 +484,52 @@ const Parser = struct {
 };
 
 // Tokenizer helpers
+
+fn decimalMatcher(str: []const u8) ?usize {
+    var i: usize = 0;
+    var state: enum { num, other } = .other;
+
+    switch (str[0]) {
+        '-', '+' => {
+            state = .other;
+            i += 1;
+        },
+        '1'...'9' => {
+            state = .num;
+            i += 1;
+        },
+        else => return null,
+    }
+
+    var has_e = false;
+
+    while (i < str.len) : (i += 1) {
+        switch (str[i]) {
+            '0'...'9' => {
+                state = .num;
+            },
+            '_' => {
+                if (state != .num) return null;
+                state = .other;
+            },
+            '.' => {
+                if (has_e or state != .num) return null;
+                state = .other;
+            },
+            'e', 'E' => {
+                if (state != .num) return null;
+
+                if (mem.indexOfScalar(u8, "-+", str[i + 1]) != null) i += 1;
+
+                state = .other;
+                has_e = true;
+            },
+            else => return null,
+        }
+    }
+
+    return i;
+}
 
 fn stringMatcher(str: []const u8) ?usize {
     const raw_string = mem.startsWith(u8, str, "\\");
