@@ -524,7 +524,10 @@ fn decimalMatcher(str: []const u8) ?usize {
                 state = .other;
                 has_e = true;
             },
-            else => return null,
+            else => {
+                if (state == .other) return null;
+                break;
+            },
         }
     }
 
