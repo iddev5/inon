@@ -77,6 +77,8 @@ const Parser = struct {
     const TokenType = enum {
         number,
         hex_number,
+        bin_number,
+        oct_number,
         string,
         identifier,
         fn_name,
@@ -103,6 +105,8 @@ const Parser = struct {
     const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
         Pattern.create(.number, decimalMatcher),
         Pattern.create(.hex_number, hexaMatcher),
+        Pattern.create(.bin_number, binMatcher),
+        Pattern.create(.oct_number, octaMatcher),
         Pattern.create(.string, stringMatcher),
         Pattern.create(.@"true", matchers.literal("true")),
         Pattern.create(.@"false", matchers.literal("false")),
@@ -144,6 +148,8 @@ const Parser = struct {
 
     const is_number = ruleset.is(.number);
     const is_hex_number = ruleset.is(.hex_number);
+    const is_bin_number = ruleset.is(.bin_number);
+    const is_oct_number = ruleset.is(.oct_number);
     const is_identifier = ruleset.is(.identifier);
     const is_string = ruleset.is(.string);
     const is_true = ruleset.is(.@"true");
@@ -294,6 +300,10 @@ const Parser = struct {
                 return self.acceptAtomNumber(.dec, is_number);
             } else if (is_hex_number(token.type)) {
                 return self.acceptAtomNumber(.hex, is_hex_number);
+            } else if (is_bin_number(token.type)) {
+                return self.acceptAtomNumber(.bin, is_bin_number);
+            } else if (is_oct_number(token.type)) {
+                return self.acceptAtomNumber(.oct, is_oct_number);
             } else if (is_identifier(token.type)) {
                 return self.acceptAtomIdentifier();
             } else if (is_string(token.type)) {
@@ -322,7 +332,7 @@ const Parser = struct {
         unreachable;
     }
 
-    const AtomNumType = enum { dec, hex };
+    const AtomNumType = enum { dec, hex, bin, oct };
     fn acceptAtomNumber(self: *Self, num_type: AtomNumType, comptime type_fn: anytype) !Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
@@ -333,6 +343,7 @@ const Parser = struct {
             .num = switch (num_type) {
                 .dec => std.fmt.parseFloat(f64, value.text) catch unreachable,
                 .hex => std.fmt.parseHexFloat(f64, value.text) catch unreachable,
+                .bin, .oct => @intToFloat(f64, std.fmt.parseInt(i64, value.text, 0) catch unreachable),
             },
         } };
     }
@@ -589,6 +600,45 @@ fn hexaMatcher(str: []const u8) ?usize {
 
     return i;
 }
+
+fn octaBinMatcher(comptime prefix: u8, comptime radix: u8) fn (str: []const u8) ?usize {
+    return struct {
+        fn func(str: []const u8) ?usize {
+            var i: usize = 0;
+            var state: enum { num, other } = .other;
+
+            switch (str[0]) {
+                '-', '+' => {
+                    i += 1;
+                },
+                '0' => {},
+                else => return null,
+            }
+
+            if (str[i] != '0' and std.ascii.toLower(str[i + 1]) != prefix)
+                return null;
+
+            i += 2;
+
+            const numbers = "012345678";
+            while (i < str.len) : (i += 1) {
+                if (mem.indexOfScalar(u8, numbers[0..radix], str[i]) != null) {
+                    state = .num;
+                } else if (str[i] == '_' and state != .other) {
+                    state = .other;
+                } else {
+                    if (state == .other) return null;
+                    break;
+                }
+            }
+
+            return i;
+        }
+    }.func;
+}
+
+const binMatcher = octaBinMatcher('b', 2);
+const octaMatcher = octaBinMatcher('o', 8);
 
 fn stringMatcher(str: []const u8) ?usize {
     const raw_string = mem.startsWith(u8, str, "\\");
