@@ -76,6 +76,7 @@ const Parser = struct {
 
     const TokenType = enum {
         number,
+        hex_number,
         string,
         identifier,
         fn_name,
@@ -101,6 +102,7 @@ const Parser = struct {
 
     const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
         Pattern.create(.number, decimalMatcher),
+        Pattern.create(.hex_number, hexaMatcher),
         Pattern.create(.string, stringMatcher),
         Pattern.create(.@"true", matchers.literal("true")),
         Pattern.create(.@"false", matchers.literal("false")),
@@ -141,6 +143,7 @@ const Parser = struct {
     const ruleset = ptk.RuleSet(TokenType);
 
     const is_number = ruleset.is(.number);
+    const is_hex_number = ruleset.is(.hex_number);
     const is_identifier = ruleset.is(.identifier);
     const is_string = ruleset.is(.string);
     const is_true = ruleset.is(.@"true");
@@ -288,7 +291,9 @@ const Parser = struct {
 
         if (try self.peek()) |token| {
             if (is_number(token.type)) {
-                return self.acceptAtomNumber();
+                return self.acceptAtomNumber(.dec, is_number);
+            } else if (is_hex_number(token.type)) {
+                return self.acceptAtomNumber(.hex, is_hex_number);
             } else if (is_identifier(token.type)) {
                 return self.acceptAtomIdentifier();
             } else if (is_string(token.type)) {
@@ -317,14 +322,18 @@ const Parser = struct {
         unreachable;
     }
 
-    fn acceptAtomNumber(self: *Self) !Data {
+    const AtomNumType = enum { dec, hex };
+    fn acceptAtomNumber(self: *Self, num_type: AtomNumType, comptime type_fn: anytype) !Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const value = try self.core.accept(is_number);
+        const value = try self.core.accept(type_fn);
 
         return Data{ .value = .{
-            .num = std.fmt.parseFloat(f64, value.text) catch unreachable,
+            .num = switch (num_type) {
+                .dec => std.fmt.parseFloat(f64, value.text) catch unreachable,
+                .hex => std.fmt.parseHexFloat(f64, value.text) catch unreachable,
+            },
         } };
     }
 
@@ -517,6 +526,53 @@ fn decimalMatcher(str: []const u8) ?usize {
                 state = .other;
             },
             'e', 'E' => {
+                if (state != .num) return null;
+
+                if (mem.indexOfScalar(u8, "-+", str[i + 1]) != null) i += 1;
+
+                state = .other;
+                has_e = true;
+            },
+            else => {
+                if (state == .other) return null;
+                break;
+            },
+        }
+    }
+
+    return i;
+}
+
+fn hexaMatcher(str: []const u8) ?usize {
+    var i: usize = 0;
+    var state: enum { num, other } = .other;
+
+    switch (str[0]) {
+        '-', '+' => {
+            i += 1;
+        },
+        '0' => {},
+        else => return null,
+    }
+
+    if (str[i] == '0') {
+        if (str[i + 1] == 'x' or str[i + 1] == 'X') {
+            i += 2;
+        } else return null;
+    } else return null;
+
+    var has_e = false;
+
+    while (i < str.len) : (i += 1) {
+        switch (str[i]) {
+            '0'...'9', 'a'...'f', 'A'...'F' => {
+                state = .num;
+            },
+            '.' => {
+                if (has_e or state != .num) return null;
+                state = .other;
+            },
+            'p', 'P' => {
                 if (state != .num) return null;
 
                 if (mem.indexOfScalar(u8, "-+", str[i + 1]) != null) i += 1;
