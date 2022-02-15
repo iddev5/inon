@@ -30,12 +30,18 @@ test "assign number" {
         \\a: 10
         \\b: -24
         \\c: 41.55
+        \\d: +58.2
+        \\e: 11e2
+        \\f: 78.1e7
     );
     defer data.deinit();
 
-    try expectEqual(@as(f64, 10.00), data.find("a").get(.num));
-    try expectEqual(@as(f64, -24.0), data.find("b").get(.num));
-    try expectEqual(@as(f64, 41.55), data.find("c").get(.num));
+    try expectEqual(@as(f64, 10.000), data.find("a").get(.num));
+    try expectEqual(@as(f64, -24.00), data.find("b").get(.num));
+    try expectEqual(@as(f64, 41.550), data.find("c").get(.num));
+    try expectEqual(@as(f64, 58.200), data.find("d").get(.num));
+    try expectEqual(@as(f64, 1100.0), data.find("e").get(.num));
+    try expectEqual(@as(f64, 78.1e7), data.find("f").get(.num));
 }
 
 test "assign string" {
