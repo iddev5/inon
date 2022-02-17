@@ -61,6 +61,21 @@ test "hex number" {
     try expectEqual(@as(f64, 0x47.98p32), data.find("e").get(.num));
 }
 
+test "oct bin number" {
+    var data = try testNormal(
+        \\a: -0o71
+        \\b: +0O23
+        \\c: +0b1101
+        \\d: -0B0101
+    );
+    defer data.deinit();
+
+    try expectEqual(@as(f64, -0o71), data.find("a").get(.num));
+    try expectEqual(@as(f64, 0o23), data.find("b").get(.num));
+    try expectEqual(@as(f64, 0b1101), data.find("c").get(.num));
+    try expectEqual(@as(f64, -0b0101), data.find("d").get(.num));
+}
+
 test "assign string" {
     var data = try testNormal(
         \\a: "hello world"
