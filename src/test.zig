@@ -44,6 +44,23 @@ test "assign number" {
     try expectEqual(@as(f64, 78.1e7), data.find("f").get(.num));
 }
 
+test "hex number" {
+    var data = try testNormal(
+        \\a: +0x10
+        \\b: -0X21
+        \\c: 0x32p2
+        \\d: 0x21.12
+        \\e: 0x47.98p32
+    );
+    defer data.deinit();
+
+    try expectEqual(@as(f64, 0x10), data.find("a").get(.num));
+    try expectEqual(@as(f64, -0x21), data.find("b").get(.num));
+    try expectEqual(@as(f64, 0x32p2), data.find("c").get(.num));
+    try expectEqual(@as(f64, 0x21.12), data.find("d").get(.num));
+    try expectEqual(@as(f64, 0x47.98p32), data.find("e").get(.num));
+}
+
 test "assign string" {
     var data = try testNormal(
         \\a: "hello world"
