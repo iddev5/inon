@@ -511,6 +511,10 @@ fn decimalMatcher(str: []const u8) ?usize {
 
     switch (str[0]) {
         '-', '+' => {
+            // Hexa, Oct or Bin
+            if (str[i + 1] == '0')
+                return null;
+
             state = .other;
             i += 1;
         },
@@ -567,7 +571,7 @@ fn hexaMatcher(str: []const u8) ?usize {
     }
 
     if (str[i] == '0') {
-        if (str[i + 1] == 'x' or str[i + 1] == 'X') {
+        if (std.ascii.toLower(str[i + 1]) == 'x') {
             i += 2;
         } else return null;
     } else return null;
