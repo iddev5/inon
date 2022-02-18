@@ -7,7 +7,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 fn testNormal(code: []const u8) !Inon.Data {
     var inon = Inon.init(std.testing.allocator);
     defer inon.deinit();
-    var data = inon.parse(code) catch |err| switch (err) {
+    var data = inon.parse("<test>", code) catch |err| switch (err) {
         error.ParsingFailed => @panic("Cannot error"),
         else => |e| return e,
     };
