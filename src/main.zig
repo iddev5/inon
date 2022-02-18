@@ -48,8 +48,8 @@ pub fn deinit(inon: *Inon) void {
     inon.context.deinit();
 }
 
-pub fn parse(inon: *Inon, src: []const u8) !Data {
-    var result = try Parser.parse(src, inon);
+pub fn parse(inon: *Inon, name: []const u8, src: []const u8) !Data {
+    var result = try Parser.parse(src, name, inon);
     errdefer result.free();
     return result;
 }
@@ -123,8 +123,8 @@ const Parser = struct {
 
     const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
-    pub fn parse(expression: []const u8, inon: *Inon) ParseError!Data {
-        var tokenizer = Tokenizer.init(expression, null);
+    pub fn parse(source: []const u8, name: []const u8, inon: *Inon) ParseError!Data {
+        var tokenizer = Tokenizer.init(source, name);
 
         var parser = Parser{
             .core = ParserCore.init(&tokenizer),

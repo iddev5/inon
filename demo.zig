@@ -13,7 +13,7 @@ pub fn main() anyerror!void {
 
     try Inon.Stdlib.addAll(&inon);
 
-    var data = inon.parse(
+    var data = inon.parse("<demo>",
         \\first_name: "joe"
         \\last_name: "something"
         \\age: 50
