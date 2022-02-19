@@ -22,11 +22,11 @@ pub fn main() anyerror!void {
         \\    street_no :: (= age 40) : 40
         \\    street_no :: (= age 50) : 50
         \\    street_no ?: 60
-        \\    num : (* (self "street_no") 2)
+        \\    num : * (self "street_no") 2
         \\    city : "nyc"
         \\}
         \\phone_nos: [100, 200, 300]
-        \\second_no: (index phone_nos 1)
+        \\second_no: index phone_nos 1
     ) catch |err| switch (err) {
         error.ParsingFailed => return try inon.renderError(stdout),
         else => |e| return e,

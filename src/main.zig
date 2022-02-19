@@ -137,6 +137,7 @@ const Parser = struct {
 
     core: ParserCore,
     inon: *Inon,
+    fn_nested: bool = false,
 
     const ruleset = ptk.RuleSet(TokenType);
 
@@ -296,11 +297,25 @@ const Parser = struct {
             } else if (is_oct_number(token.type)) {
                 return self.acceptAtomNumber(.oct, is_oct_number);
             } else if (is_identifier(token.type)) {
-                return self.acceptAtomIdentifier();
+                const tok = try self.core.accept(is_identifier);
+                if (self.inon.functions.get(tok.text)) |_| {
+                    if (self.fn_nested) {
+                        try self.emitError("nested function calls has to be enclosed in parens", .{});
+                        return error.ParsingFailed;
+                    }
+                    self.fn_nested = true;
+                    defer self.fn_nested = false;
+                    return self.acceptFunctionCall(tok);
+                }
+                return self.acceptAtomIdentifier(tok);
             } else if (is_string(token.type)) {
                 return self.acceptAtomString();
             } else if (is_lpar(token.type)) {
-                return self.acceptFunctionCall();
+                _ = (try self.core.accept(is_lpar));
+                const tok = try self.core.accept(is_identifier);
+                const atom = self.acceptFunctionCall(tok);
+                _ = (try self.core.accept(is_rpar));
+                return atom;
             } else if (is_lsqr(token.type)) {
                 return self.acceptAtomList();
             } else if (is_lbrac(token.type)) {
@@ -339,11 +354,10 @@ const Parser = struct {
         } };
     }
 
-    fn acceptAtomIdentifier(self: *Self) ParseError!Data {
+    fn acceptAtomIdentifier(self: *Self, token: Tokenizer.Token) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const token = try self.core.accept(is_identifier);
         const data = self.inon.context.findEx(token.text);
         if (data.is(.nulled)) {
             try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
@@ -431,14 +445,12 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptFunctionCall(self: *Self) ParseError!Data {
+    fn acceptFunctionCall(self: *Self, token: Tokenizer.Token) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        _ = try self.core.accept(is_lpar);
-
         const fn_name = blk: {
-            const text = (try self.core.accept(is_identifier)).text;
+            const text = token.text;
             if (mem.startsWith(u8, text, "'")) {
                 break :blk text[1 .. text.len - 1];
             } else {
@@ -455,13 +467,12 @@ const Parser = struct {
         };
         const param_count = func.params.len;
 
-        while (try self.peek()) |tok| {
-            if (is_rpar(tok.type)) {
-                break;
-            }
-
-            const arg = try self.acceptAtom();
-            try args.value.array.append(args.allocator, arg);
+        var i: usize = 0;
+        while (i < param_count) : (i += 1) {
+            if (try self.peek()) |_| {
+                const arg = try self.acceptAtom();
+                try args.value.array.append(args.allocator, arg);
+            } else break;
         }
 
         // Validate argument count
@@ -489,8 +500,6 @@ const Parser = struct {
                 }
             }
         }
-
-        _ = try self.core.accept(is_rpar);
 
         // Run the function and return the result
         return try func.run(self.inon, args.get(.array).items);
