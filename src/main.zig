@@ -449,7 +449,10 @@ const Parser = struct {
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
         defer args.deinit();
 
-        const func = if (self.inon.functions.get(fn_name)) |func| func else unreachable;
+        const func = if (self.inon.functions.get(fn_name)) |func| func else {
+            try self.emitError("function '{s}' has not been defined", .{fn_name});
+            return error.ParsingFailed;
+        };
         const param_count = func.params.len;
 
         while (try self.peek()) |tok| {
