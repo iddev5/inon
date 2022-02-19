@@ -449,12 +449,32 @@ const Parser = struct {
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
         defer args.deinit();
 
-        const func = if (self.inon.functions.get(fn_name)) |func| func else {
-            try self.emitError("function '{s}' has not been defined", .{fn_name});
-            return error.ParsingFailed;
-        };
+        if (self.inon.functions.get(fn_name)) |func| {
+            return self.acceptAndCallFunction(&func, &args);
+        } else {
+            const obj = self.inon.context.findEx(fn_name);
+            if (obj.value != .nulled) {
+                try args.value.array.append(args.allocator, try obj.copy(self.inon.allocator));
+
+                const func_name = (try self.core.accept(is_identifier)).text;
+                const func = if (self.inon.functions.get(func_name)) |func| func else {
+                    try self.emitError("function '{s}' has not been defined", .{fn_name});
+                    return error.ParsingFailed;
+                };
+
+                return self.acceptAndCallFunction(&func, &args);
+            } else {
+                try self.emitError("function '{s}' has not been defined", .{fn_name});
+                return error.ParsingFailed;
+            }
+        }
+    }
+
+    fn acceptAndCallFunction(self: *Self, func: *const FuncType, args: *Data) ParseError!Data {
+        const func_name = func.name;
         const param_count = func.params.len;
 
+        // Accept all arguments
         while (try self.peek()) |tok| {
             if (is_rpar(tok.type)) {
                 break;
@@ -464,10 +484,11 @@ const Parser = struct {
             try args.value.array.append(args.allocator, arg);
         }
 
-        // Validate argument count
         const no_of_args = args.get(.array).items.len;
+
+        // Validate argument count
         if (no_of_args != param_count) {
-            try self.emitError("function '{s}' takes {} args, found {}", .{ fn_name, param_count, no_of_args });
+            try self.emitError("function '{s}' takes {} args, found {}", .{ func_name, param_count, no_of_args });
             return error.ParsingFailed;
         }
 
@@ -479,7 +500,7 @@ const Parser = struct {
                     try self.emitError(
                         "function '{s}' expects argument {} be of type '{s}' while '{s}' is given",
                         .{
-                            fn_name,
+                            func_name,
                             index,
                             @tagName(par),
                             @tagName(arg.value),
