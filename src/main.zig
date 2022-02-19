@@ -505,14 +505,10 @@ fn decimalMatcher(str: []const u8) ?usize {
 
     switch (str[0]) {
         '-', '+' => {
-            // Hexa, Oct or Bin
-            if (str[i + 1] == '0')
-                return null;
-
             state = .other;
             i += 1;
         },
-        '1'...'9' => {
+        '0'...'9' => {
             state = .num;
             i += 1;
         },
@@ -542,6 +538,7 @@ fn decimalMatcher(str: []const u8) ?usize {
                 state = .other;
                 has_e = true;
             },
+            'x', 'X', 'b', 'B', 'o', 'O' => return null,
             else => {
                 if (state == .other) return null;
                 break;
