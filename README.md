@@ -1,5 +1,5 @@
 # inon
-Data serialization format in Zig
+Data configuration format in Zig
 
 - Simple human-readable data serialization format
 - Host function execution capabilties
