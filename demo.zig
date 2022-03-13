@@ -37,6 +37,11 @@ pub fn main() anyerror!void {
 
     try stdout.print("Serialized: \n\n", .{});
     try inon.serialize(&data, stdout);
+    try stdout.writeByte('\n');
+
+    try stdout.print("Json: \n\n", .{});
+    try inon.serializeToJson(&data, stdout);
+    try stdout.writeByte('\n');
 
     std.log.info("All your config files are belong to us.", .{});
 }

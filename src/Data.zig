@@ -188,3 +188,42 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
         },
     }
 }
+
+pub fn serializeToJson(self: *Data, writer: anytype) !void {
+    // Depth 10 should be enough?
+    var jw = std.json.writeStream(writer, 10);
+    try serializeJsonInternal(self, &jw);
+}
+
+fn serializeJsonInternal(self: *Data, jw: anytype) std.os.WriteError!void {
+    switch (self.value) {
+        .num => try jw.emitNumber(self.value.num),
+        .bool => try jw.emitBool(self.value.bool),
+        .nulled => try jw.emitNull(),
+        .str => try jw.emitString(self.value.str.items),
+        .array => {
+            try jw.beginArray();
+
+            for (self.value.array.items) |*item| {
+                try jw.arrayElem();
+                try item.serializeJsonInternal(jw);
+            }
+
+            try jw.endArray();
+        },
+        .map => {
+            try jw.beginObject();
+
+            var it = self.value.map.iterator();
+            while (it.next()) |entry| {
+                const key = entry.key_ptr.*;
+                var value = entry.value_ptr.*;
+
+                try jw.objectField(key);
+                try value.serializeJsonInternal(jw);
+            }
+
+            try jw.endObject();
+        },
+    }
+}

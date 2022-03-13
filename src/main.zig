@@ -59,6 +59,11 @@ pub fn serialize(inon: *Inon, data: *Data, writer: anytype) !void {
     try data.serialize(4, writer);
 }
 
+pub fn serializeToJson(inon: *Inon, data: *Data, writer: anytype) !void {
+    _ = inon;
+    try data.serializeToJson(writer);
+}
+
 pub fn renderError(inon: *Inon, writer: anytype) !void {
     try inon.diagnostics.print(writer);
 }
