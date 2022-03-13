@@ -152,11 +152,14 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
             const arr = self.value.array;
             var id: usize = 0;
 
-            _ = try writer.write("[\n");
+            try writer.writeAll("[\n");
 
             while (id < arr.items.len) : (id += 1) {
+                // Write value
                 try writer.writeByteNTimes(' ', start + indent);
                 try arr.items[id].serializeInternal(start, indent, writer);
+
+                // If not last element then write a comma
                 if (id != arr.items.len - 1)
                     try writer.writeByte(',');
 
@@ -164,14 +167,14 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
             }
 
             try writer.writeByteNTimes(' ', start);
-            _ = try writer.write("]");
+            try writer.writeByte(']');
         },
         .map => {
             const map = self.value.map;
             var iter = map.iterator();
             var id: usize = 0;
 
-            _ = try writer.write("{\n");
+            try writer.writeAll("{\n");
 
             while (iter.next()) |entry| : (id += 1) {
                 const key = entry.key_ptr.*;
@@ -179,16 +182,16 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
                     continue;
 
                 // Write key
-                _ = try writer.writeByteNTimes(' ', start + indent);
-                try writer.print("{s} : ", .{key});
+                try writer.writeByteNTimes(' ', start + indent);
+                try writer.print("{s}: ", .{key});
 
                 // Write value
                 try entry.value_ptr.*.serializeInternal(start + indent, indent, writer);
-                _ = try writer.write("\n");
+                try writer.writeByte('\n');
             }
 
-            _ = try writer.writeByteNTimes(' ', start);
-            _ = try writer.write("}");
+            try writer.writeByteNTimes(' ', start);
+            try writer.writeByte('}');
         },
     }
 }
