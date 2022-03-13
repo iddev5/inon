@@ -152,14 +152,18 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
             const arr = self.value.array;
             var id: usize = 0;
 
-            _ = try writer.write("[");
+            _ = try writer.write("[\n");
 
             while (id < arr.items.len) : (id += 1) {
+                try writer.writeByteNTimes(' ', start + indent);
                 try arr.items[id].serializeInternal(start, indent, writer);
                 if (id != arr.items.len - 1)
-                    _ = try writer.write(", ");
+                    try writer.writeByte(',');
+
+                try writer.writeByte('\n');
             }
 
+            try writer.writeByteNTimes(' ', start);
             _ = try writer.write("]");
         },
         .map => {
