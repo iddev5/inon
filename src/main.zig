@@ -61,7 +61,7 @@ pub fn serialize(inon: *Inon, data: *Data, writer: anytype) !void {
 
 pub fn serializeToJson(inon: *Inon, data: *Data, writer: anytype) !void {
     _ = inon;
-    try data.serializeToJson(writer);
+    try data.serializeToJson(4, writer);
 }
 
 pub fn renderError(inon: *Inon, writer: anytype) !void {

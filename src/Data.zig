@@ -195,9 +195,10 @@ fn serializeInternal(self: *Data, start: usize, indent: usize, writer: std.fs.Fi
     }
 }
 
-pub fn serializeToJson(self: *Data, writer: anytype) !void {
+pub fn serializeToJson(self: *Data, indent: usize, writer: anytype) !void {
     // Depth 10 should be enough?
     var jw = std.json.writeStream(writer, 10);
+    jw.whitespace.indent.Space = @intCast(u8, indent);
     try serializeJsonInternal(self, &jw);
 }
 
