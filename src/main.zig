@@ -400,18 +400,37 @@ const Parser = struct {
             var i: usize = 1;
             while (i < token.len - 1) : (i += 1) {
                 const next_is_es = token[i] == '\\' and i + 1 < token.len;
-                try str.value.str.append(str.allocator, if (next_is_es) blk: {
+                const next_is_in = token[i] == '{';
+
+                if (next_is_es) {
+                    try str.value.str.append(str.allocator, blk: {
+                        i += 1;
+                        break :blk switch (token[i]) {
+                            'r' => '\r',
+                            't' => '\t',
+                            'n' => '\n',
+                            '\"' => '\"',
+                            '\'' => '\'',
+                            '\\' => '\\',
+                            else => token[i],
+                        };
+                    });
+                } else if (next_is_in) {
                     i += 1;
-                    break :blk switch (token[i]) {
-                        'r' => '\r',
-                        't' => '\t',
-                        'n' => '\n',
-                        '\"' => '\"',
-                        '\'' => '\'',
-                        '\\' => '\\',
-                        else => token[i],
-                    };
-                } else token[i]);
+                    const in_end_pos = mem.indexOfScalar(u8, token[i..], '}');
+                    if (in_end_pos) |pos| {
+                        const sub_name = token[i .. pos + i];
+                        const data = self.inon.context.findEx(sub_name);
+
+                        try str.value.str.appendSlice(str.allocator, data.value.str.items);
+                        i += pos;
+                    } else {
+                        try self.emitError("unmatched '}}' in string interpolation", .{});
+                        return error.ParsingFailed;
+                    }
+                } else {
+                    try str.value.str.append(str.allocator, token[i]);
+                }
             }
         }
 

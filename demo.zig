@@ -15,7 +15,7 @@ pub fn main() anyerror!void {
 
     var data = inon.parse("<demo>",
         \\first_name: "joe"
-        \\last_name: "something"
+        \\last_name: "some {first_name} thing"
         \\age: 50
         \\address: {
         \\    street_no :: (= age 30) : 420
