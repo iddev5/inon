@@ -422,7 +422,12 @@ const Parser = struct {
                         const sub_name = token[i .. pos + i];
                         const data = self.inon.context.findEx(sub_name);
 
-                        try str.value.str.appendSlice(str.allocator, data.value.str.items);
+                        const writer = str.value.str.writer(str.allocator);
+                        try data.serialize(0, writer, .{
+                            .quote_string = false,
+                            .write_newlines = false,
+                        });
+
                         i += pos;
                     } else {
                         try self.emitError("unmatched '}}' in string interpolation", .{});
