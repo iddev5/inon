@@ -149,7 +149,11 @@ pub fn serialize(self: *const Data, indent: usize, writer: anytype, options: Ser
 fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: anytype, options: SerializeOptions) @TypeOf(writer).Error!void {
     switch (self.value) {
         .bool => try writer.print("{}", .{self.value.bool}),
-        .num => try writer.print("{}", .{self.value.num}),
+        .num => if (self.value.num > 100000) {
+            try writer.print("{e}", .{self.value.num});
+        } else {
+            try writer.print("{d}", .{self.value.num});
+        },
         .nulled => try writer.writeAll("null"),
         .str => if (options.quote_string) {
             try writer.print("\"{s}\"", .{self.value.str.items});
