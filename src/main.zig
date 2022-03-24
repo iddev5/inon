@@ -54,12 +54,12 @@ pub fn parse(inon: *Inon, name: []const u8, src: []const u8) !Data {
     return result;
 }
 
-pub fn serialize(inon: *Inon, data: *Data, writer: anytype) !void {
+pub fn serialize(inon: *Inon, data: *Data, writer: anytype) @TypeOf(writer).Error!void {
     _ = inon;
     try data.serialize(4, writer, .{});
 }
 
-pub fn serializeToJson(inon: *Inon, data: *Data, writer: anytype) !void {
+pub fn serializeToJson(inon: *Inon, data: *Data, writer: anytype) @TypeOf(writer).Error!void {
     _ = inon;
     try data.serializeToJson(4, writer);
 }
