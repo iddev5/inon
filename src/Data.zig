@@ -215,14 +215,14 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
     }
 }
 
-pub fn serializeToJson(self: *Data, indent: usize, writer: anytype) !void {
+pub fn serializeToJson(self: *Data, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
     // Depth 10 should be enough?
     var jw = std.json.writeStream(writer, 10);
     jw.whitespace.indent.Space = @intCast(u8, indent);
     try serializeJsonInternal(self, &jw);
 }
 
-fn serializeJsonInternal(self: *Data, jw: anytype) std.os.WriteError!void {
+fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void {
     switch (self.value) {
         .num => try jw.emitNumber(self.value.num),
         .bool => try jw.emitBool(self.value.bool),
