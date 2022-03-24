@@ -137,11 +137,11 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
     }
 }
 
-pub fn serialize(self: *Data, indent: usize, writer: anytype) std.os.WriteError!void {
+pub fn serialize(self: *Data, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
     try self.serializeInternal(0, indent, writer);
 }
 
-fn serializeInternal(self: *Data, start: usize, indent: usize, writer: anytype) std.os.WriteError!void {
+fn serializeInternal(self: *Data, start: usize, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
     switch (self.value) {
         .bool => try writer.print("{}", .{self.value.bool}),
         .num => try writer.print("{}", .{self.value.num}),
