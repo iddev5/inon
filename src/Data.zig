@@ -137,32 +137,44 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
     }
 }
 
-pub fn serialize(self: *const Data, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
-    try self.serializeInternal(0, indent, writer);
+pub const SerializeOptions = struct {
+    quote_string: bool = true,
+    write_newlines: bool = true,
+};
+
+pub fn serialize(self: *const Data, indent: usize, writer: anytype, options: SerializeOptions) @TypeOf(writer).Error!void {
+    try self.serializeInternal(0, indent, writer, options);
 }
 
-fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
+fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: anytype, options: SerializeOptions) @TypeOf(writer).Error!void {
     switch (self.value) {
         .bool => try writer.print("{}", .{self.value.bool}),
         .num => try writer.print("{}", .{self.value.num}),
         .nulled => try writer.writeAll("null"),
-        .str => try writer.print("\"{s}\"", .{self.value.str.items}),
+        .str => if (options.quote_string) {
+            try writer.print("\"{s}\"", .{self.value.str.items});
+        } else {
+            try writer.writeAll(self.value.str.items);
+        },
         .array => {
             const arr = self.value.array;
             var id: usize = 0;
 
-            try writer.writeAll("[\n");
+            try writer.writeByte('[');
+            if (options.write_newlines)
+                try writer.writeByte('\n');
 
             while (id < arr.items.len) : (id += 1) {
                 // Write value
                 try writer.writeByteNTimes(' ', start + indent);
-                try arr.items[id].serializeInternal(start, indent, writer);
+                try arr.items[id].serializeInternal(start, indent, writer, options);
 
                 // If not last element then write a comma
                 if (id != arr.items.len - 1)
-                    try writer.writeByte(',');
+                    try writer.writeAll(", ");
 
-                try writer.writeByte('\n');
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
             }
 
             try writer.writeByteNTimes(' ', start);
@@ -173,7 +185,9 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             var iter = map.iterator();
             var id: usize = 0;
 
-            try writer.writeAll("{\n");
+            try writer.writeByte('{');
+            if (options.write_newlines)
+                try writer.writeByte('\n');
 
             while (iter.next()) |entry| : (id += 1) {
                 const key = entry.key_ptr.*;
@@ -185,8 +199,14 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try writer.print("{s}: ", .{key});
 
                 // Write value
-                try entry.value_ptr.*.serializeInternal(start + indent, indent, writer);
-                try writer.writeByte('\n');
+                try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
+
+                // Write newline if allowed, otherwise write a comma
+                if (options.write_newlines) {
+                    try writer.writeByte('\n');
+                } else if (id != map.size - 1) {
+                    try writer.writeAll(", ");
+                }
             }
 
             try writer.writeByteNTimes(' ', start);

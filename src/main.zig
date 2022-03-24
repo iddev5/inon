@@ -56,7 +56,7 @@ pub fn parse(inon: *Inon, name: []const u8, src: []const u8) !Data {
 
 pub fn serialize(inon: *Inon, data: *Data, writer: anytype) !void {
     _ = inon;
-    try data.serialize(4, writer);
+    try data.serialize(4, writer, .{});
 }
 
 pub fn serializeToJson(inon: *Inon, data: *Data, writer: anytype) !void {
