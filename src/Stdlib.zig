@@ -59,6 +59,13 @@ pub fn addAll(inon: *Inon) !void {
     };
 
     for (functions) |f| {
-        try inon.functions.put(inon.allocator, f.name, f);
+        var fun_desc = try inon.allocator.create(Inon.FuncType);
+        errdefer inon.allocator.destroy(fun_desc);
+
+        fun_desc.* = f;
+        try inon.context.value.map.put(inon.allocator, f.name, Data{
+            .value = .{ .native_func = fun_desc },
+            .allocator = inon.allocator,
+        });
     }
 }

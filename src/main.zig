@@ -4,11 +4,11 @@ const Allocator = mem.Allocator;
 const ptk = @import("parser-toolkit");
 pub const Data = @import("Data.zig");
 pub const Stdlib = @import("Stdlib.zig");
+pub const FuncType = Data.FuncType;
 
 const Inon = @This();
 
 allocator: Allocator,
-functions: FuncList,
 context: Data,
 current_context: *Data,
 diagnostics: ptk.Diagnostics,
@@ -22,21 +22,10 @@ const Message = struct {
     }
 };
 
-const Error = mem.Allocator.Error;
-
-pub const FuncFnType = fn (inon: *Inon, params: []Data) Error!Data;
-pub const FuncType = struct {
-    name: []const u8,
-    params: []const ?Data.Type,
-    run: FuncFnType,
-};
-pub const FuncList = std.StringArrayHashMapUnmanaged(FuncType);
-
 pub fn init(allocator: Allocator) Inon {
     return .{
         .allocator = allocator,
         .diagnostics = ptk.Diagnostics.init(allocator),
-        .functions = .{},
         .context = .{ .value = .{ .map = .{} }, .allocator = allocator },
         .current_context = undefined,
     };
@@ -44,7 +33,6 @@ pub fn init(allocator: Allocator) Inon {
 
 pub fn deinit(inon: *Inon) void {
     inon.diagnostics.deinit();
-    inon.functions.deinit(inon.allocator);
     inon.context.deinit();
 }
 
@@ -303,7 +291,7 @@ const Parser = struct {
                 return self.acceptAtomNumber(.oct, is_oct_number);
             } else if (is_identifier(token.type)) {
                 const tok = try self.core.accept(is_identifier);
-                if (self.inon.functions.get(tok.text)) |_| {
+                if (self.inon.context.findEx(tok.text).value == .native_func) {
                     if (self.fn_nested) {
                         try self.emitError("nested function calls has to be enclosed in parens", .{});
                         return error.ParsingFailed;
@@ -490,9 +478,12 @@ const Parser = struct {
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
         defer args.deinit();
 
-        const func = if (self.inon.functions.get(fn_name)) |func| func else {
-            try self.emitError("function '{s}' has not been defined", .{fn_name});
-            return error.ParsingFailed;
+        const func = blk: {
+            const fun = self.inon.context.findEx(fn_name);
+            break :blk if (fun.value == .native_func) fun.value.native_func else {
+                try self.emitError("function '{s}' has not been defined", .{fn_name});
+                return error.ParsingFailed;
+            };
         };
         const param_count = func.params.len;
 

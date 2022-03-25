@@ -10,12 +10,22 @@ value: union(Type) {
     array: Array,
     map: Map,
     nulled: void,
+    native_func: *FuncType,
 } = undefined,
 allocator: Allocator = undefined,
 
 pub const String = std.ArrayListUnmanaged(u8);
 pub const Array = std.ArrayListUnmanaged(Data);
 pub const Map = std.StringHashMapUnmanaged(Data);
+
+const Error = std.mem.Allocator.Error;
+const Inon = @import("main.zig");
+pub const FuncFnType = fn (inon: *Inon, params: []Data) Error!Data;
+pub const FuncType = struct {
+    name: []const u8,
+    params: []const ?Data.Type,
+    run: FuncFnType,
+};
 
 pub const Type = enum(u8) {
     bool,
@@ -24,6 +34,7 @@ pub const Type = enum(u8) {
     array,
     map,
     nulled,
+    native_func,
 };
 
 pub const null_data = Data{ .value = .{ .nulled = .{} } };
@@ -31,6 +42,7 @@ pub const null_data = Data{ .value = .{ .nulled = .{} } };
 pub fn deinit(self: *Data) void {
     switch (self.value) {
         .str => self.value.str.deinit(self.allocator),
+        .native_func => self.allocator.destroy(self.value.native_func),
         .array => {
             for (self.value.array.items) |item| {
                 var i = item;
@@ -60,6 +72,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .array => Array,
     .map => Map,
     .nulled => @compileError("cannot use Data.get(.nulled)"),
+    .native_func => @compileError("TODO"),
 } {
     return @field(self.value, @tagName(t));
 }
@@ -101,12 +114,13 @@ pub fn eql(self: *const Data, data: *const Data) bool {
         .array => false, // TODO
         .map => false, // TODO
         .nulled => true,
+        .native_func => unreachable,
     };
 }
 
 pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
     switch (self.value) {
-        .bool, .num, .nulled => return self.*,
+        .bool, .num, .nulled, .native_func => return self.*,
         .str => {
             var data = Data{ .value = .{ .str = .{} }, .allocator = allocator };
             for (self.value.str.items) |item| {
@@ -155,6 +169,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             try writer.print("{d}", .{self.value.num});
         },
         .nulled => try writer.writeAll("null"),
+        .native_func => {},
         .str => if (options.quote_string) {
             try writer.print("\"{s}\"", .{self.value.str.items});
         } else {
@@ -195,7 +210,12 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
 
             while (iter.next()) |entry| : (id += 1) {
                 const key = entry.key_ptr.*;
+                const value = entry.value_ptr.*;
+
                 if (std.mem.startsWith(u8, key, "_"))
+                    continue;
+
+                if (value.is(.native_func))
                     continue;
 
                 // Write key
@@ -203,7 +223,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try writer.print("{s}: ", .{key});
 
                 // Write value
-                try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
+                try value.serializeInternal(start + indent, indent, writer, options);
 
                 // Write newline if allowed, otherwise write a comma
                 if (options.write_newlines) {
@@ -232,6 +252,7 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
         .bool => try jw.emitBool(self.value.bool),
         .nulled => try jw.emitNull(),
         .str => try jw.emitString(self.value.str.items),
+        .native_func => {},
         .array => {
             try jw.beginArray();
 
@@ -249,6 +270,9 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
             while (it.next()) |entry| {
                 const key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
+
+                if (value.is(.native_func))
+                    continue;
 
                 try jw.objectField(key);
                 try value.serializeJsonInternal(jw);
