@@ -114,3 +114,33 @@ test "string interpolation" {
     try expectEqualStrings("a is 10 value", data.find("b").get(.str).items);
     try expectEqualStrings("hello world", data.find("d").get(.str).items);
 }
+
+test "assign array" {
+    var data = try testNormal(
+        \\a: [10, true, "test"]
+    );
+    defer data.deinit();
+
+    const array = data.find("a").get(.array).items;
+
+    try expectEqual(@as(f64, 10), array[0].get(.num));
+    try expectEqual(true, array[1].get(.bool));
+    try expectEqualStrings("test", array[2].get(.str).items);
+}
+
+test "nested array" {
+    var data = try testNormal(
+        \\a: [10, [20, 30], 40]
+    );
+    defer data.deinit();
+
+    const array = data.find("a").get(.array).items;
+
+    try expectEqual(@as(f64, 10), array[0].get(.num));
+    {
+        const inner_array = array[1].get(.array).items;
+        try expectEqual(@as(f64, 20), inner_array[0].get(.num));
+        try expectEqual(@as(f64, 30), inner_array[1].get(.num));
+    }
+    try expectEqual(@as(f64, 40), array[2].get(.num));
+}
