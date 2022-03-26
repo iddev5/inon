@@ -89,3 +89,17 @@ test "assign string" {
     try expectEqualStrings("hello world", data.find("a").get(.str).items);
     try expectEqualStrings("slightly\nlonger\nstring\n", data.find("b").get(.str).items);
 }
+
+test "string interpolation" {
+    var data = try testNormal(
+        \\a: 10
+        \\b: "a is {a} value"
+        \\
+        \\c: "hello"
+        \\d: "{c} world"
+    );
+    defer data.deinit();
+
+    try expectEqualStrings("a is 10 value", data.find("b").get(.str).items);
+    try expectEqualStrings("hello world", data.find("d").get(.str).items);
+}
