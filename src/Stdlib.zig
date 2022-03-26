@@ -41,9 +41,6 @@ const Lib = struct {
     fn eql(_: *Inon, params: []Data) !Data {
         const data1 = params[0];
         const data2 = params[1];
-        if (std.meta.activeTag(data1.value) != std.meta.activeTag(data2.value)) {
-            return Data{ .value = .{ .bool = false } };
-        }
         return Data{ .value = .{ .bool = data1.eql(&data2) } };
     }
 };

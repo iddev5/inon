@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const meta = std.meta;
 
 const Data = @This();
 
@@ -92,8 +93,10 @@ pub fn index(self: *const Data, in: usize) !Data {
     };
 }
 
-// Unsafe, check for matching tags separately
 pub fn eql(self: *const Data, data: *const Data) bool {
+    if (meta.activeTag(self.value) != meta.activeTag(data.value))
+        return false;
+
     return switch (self.value) {
         .bool => self.value.bool == data.value.bool,
         .num => self.value.num == data.value.num,
