@@ -1,8 +1,10 @@
 const std = @import("std");
+const testing = std.testing;
 const Inon = @import("main.zig");
 
-const expectEqual = std.testing.expectEqual;
-const expectEqualStrings = std.testing.expectEqualStrings;
+const expect = testing.expect;
+const expectEqual = testing.expectEqual;
+const expectEqualStrings = testing.expectEqualStrings;
 
 fn testNormal(code: []const u8) !Inon.Data {
     var inon = Inon.init(std.testing.allocator);
@@ -12,6 +14,15 @@ fn testNormal(code: []const u8) !Inon.Data {
         else => |e| return e,
     };
     return data.copy(std.testing.allocator);
+}
+
+test "null value" {
+    var data = try testNormal(
+        \\a: null
+    );
+    defer data.deinit();
+
+    try expect(data.find("a").is(.nulled));
 }
 
 test "assign bool" {
