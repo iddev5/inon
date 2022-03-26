@@ -74,6 +74,7 @@ const Parser = struct {
         @"true",
         @"false",
         @"null",
+        ref,
         @"::",
         @"?:",
         @":",
@@ -98,6 +99,7 @@ const Parser = struct {
         Pattern.create(.@"true", matchers.literal("true")),
         Pattern.create(.@"false", matchers.literal("false")),
         Pattern.create(.@"null", matchers.literal("null")),
+        Pattern.create(.ref, matchers.literal("ref")),
         Pattern.create(.whitespace, matchers.takeAnyOf(" \n\r\t")),
         Pattern.create(.comment, commentMatcher),
         Pattern.create(.@"::", matchers.literal("::")),
@@ -143,6 +145,7 @@ const Parser = struct {
     const is_true = ruleset.is(.@"true");
     const is_false = ruleset.is(.@"false");
     const is_null = ruleset.is(.@"null");
+    const is_ref = ruleset.is(.ref);
     const is_dualcolon = ruleset.is(.@"::");
     const is_optcolon = ruleset.is(.@"?:");
     const is_colon = ruleset.is(.@":");
@@ -322,6 +325,10 @@ const Parser = struct {
             } else if (is_null(token.type)) {
                 _ = (try self.core.accept(is_null));
                 return Data{ .value = .{ .nulled = .{} } };
+            } else if (is_ref(token.type)) {
+                _ = try self.core.accept(is_ref);
+                const tok = try self.core.accept(is_identifier);
+                return self.inon.context.findEx(tok.text);
             } else {
                 try self.emitError("expected expression, literal or function call", .{});
                 return error.ParsingFailed;
