@@ -446,6 +446,10 @@ const Parser = struct {
                     // Bracket escape end
                     if (token[i + 1] == '}') {
                         try str.value.str.append(str.allocator, '}');
+                        i += 1;
+                    } else {
+                        try self.emitError("stray '}}' outside of string interpolation", .{});
+                        return error.ParsingFailed;
                     }
                 } else {
                     try str.value.str.append(str.allocator, token[i]);

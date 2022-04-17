@@ -148,6 +148,10 @@ test "unmatched interpolation" {
     try testError(
         \\a: "{"
     , "unmatched '{' in string interpolation");
+
+    try testError(
+        \\a: "}"
+    , "stray '}' outside of string interpolation");
 }
 
 test "assign array" {
