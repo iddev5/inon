@@ -439,7 +439,7 @@ const Parser = struct {
 
                         i += pos;
                     } else {
-                        try self.emitError("unmatched '}}' in string interpolation", .{});
+                        try self.emitError("unmatched '{{' in string interpolation", .{});
                         return error.ParsingFailed;
                     }
                 } else if (token[i] == '}') {

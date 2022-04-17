@@ -144,6 +144,12 @@ test "interpolation escape" {
     try expectEqualStrings("{something}", data.find("a").get(.str).items);
 }
 
+test "unmatched interpolation" {
+    try testError(
+        \\a: "{"
+    , "unmatched '{' in string interpolation");
+}
+
 test "assign array" {
     var data = try testNormal(
         \\a: [10, true, "test"]
