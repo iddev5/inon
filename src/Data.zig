@@ -168,10 +168,11 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             var id: usize = 0;
 
             try writer.writeByte('[');
-            if (options.write_newlines)
-                try writer.writeByte('\n');
 
             while (id < arr.items.len) : (id += 1) {
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
+
                 // Write value
                 try writer.writeByteNTimes(' ', start + indent);
                 try arr.items[id].serializeInternal(start, indent, writer, options);
@@ -179,12 +180,13 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 // If not last element then write a comma
                 if (id != arr.items.len - 1)
                     try writer.writeAll(", ");
-
-                if (options.write_newlines)
-                    try writer.writeByte('\n');
             }
 
-            try writer.writeByteNTimes(' ', start);
+            if (id > 0) {
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
+                try writer.writeByteNTimes(' ', start);
+            }
             try writer.writeByte(']');
         },
         .map => {
@@ -193,10 +195,11 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             var id: usize = 0;
 
             try writer.writeByte('{');
-            if (options.write_newlines)
-                try writer.writeByte('\n');
 
             while (iter.next()) |entry| : (id += 1) {
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
+
                 const key = entry.key_ptr.*;
                 if (std.mem.startsWith(u8, key, "_"))
                     continue;
@@ -209,14 +212,16 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
 
                 // Write newline if allowed, otherwise write a comma
-                if (options.write_newlines) {
-                    try writer.writeByte('\n');
-                } else if (id != map.size - 1) {
+                if (!options.write_newlines and id != map.size - 1) {
                     try writer.writeAll(", ");
                 }
             }
 
-            try writer.writeByteNTimes(' ', start);
+            if (id > 0) {
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
+                try writer.writeByteNTimes(' ', start);
+            }
             try writer.writeByte('}');
         },
     }
