@@ -135,6 +135,15 @@ test "empty interpolation" {
     , "empty expressions not allowed in string interpolation");
 }
 
+test "interpolation escape" {
+    var data = try testNormal(
+        \\a: "{{something}}"
+    );
+    defer data.deinit();
+
+    try expectEqualStrings("{something}", data.find("a").get(.str).items);
+}
+
 test "assign array" {
     var data = try testNormal(
         \\a: [10, true, "test"]

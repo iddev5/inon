@@ -399,10 +399,7 @@ const Parser = struct {
         } else {
             var i: usize = 1;
             while (i < token.len - 1) : (i += 1) {
-                const next_is_es = token[i] == '\\' and i + 1 < token.len;
-                const next_is_in = token[i] == '{';
-
-                if (next_is_es) {
+                if (token[i] == '\\' and i + 1 < token.len) {
                     try str.value.str.append(str.allocator, blk: {
                         i += 1;
                         break :blk switch (token[i]) {
@@ -415,8 +412,15 @@ const Parser = struct {
                             else => token[i],
                         };
                     });
-                } else if (next_is_in) {
+                } else if (token[i] == '{') {
                     i += 1;
+
+                    // Bracket escape begin
+                    if (token[i] == '{') {
+                        try str.value.str.append(str.allocator, '{');
+                        continue;
+                    }
+
                     const in_end_pos = mem.indexOfScalar(u8, token[i..], '}');
                     if (in_end_pos) |pos| {
                         const sub_name = token[i .. pos + i];
@@ -437,6 +441,11 @@ const Parser = struct {
                     } else {
                         try self.emitError("unmatched '}}' in string interpolation", .{});
                         return error.ParsingFailed;
+                    }
+                } else if (token[i] == '}') {
+                    // Bracket escape end
+                    if (token[i + 1] == '}') {
+                        try str.value.str.append(str.allocator, '}');
                     }
                 } else {
                     try str.value.str.append(str.allocator, token[i]);
