@@ -420,6 +420,11 @@ const Parser = struct {
                     const in_end_pos = mem.indexOfScalar(u8, token[i..], '}');
                     if (in_end_pos) |pos| {
                         const sub_name = token[i .. pos + i];
+                        if (sub_name.len == 0) {
+                            try self.emitError("empty expressions not allowed in string interpolation", .{});
+                            return error.ParsingFailed;
+                        }
+
                         const data = self.inon.context.findEx(sub_name);
 
                         const writer = str.value.str.writer(str.allocator);

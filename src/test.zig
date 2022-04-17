@@ -16,6 +16,20 @@ fn testNormal(code: []const u8) !Inon.Data {
     return data.copy(std.testing.allocator);
 }
 
+fn testError(code: []const u8, error_str: []const u8) !void {
+    var inon = Inon.init(std.testing.allocator);
+    defer inon.deinit();
+    _ = inon.parse("<test>", code) catch |err| switch (err) {
+        error.ParsingFailed => {
+            const diag_err = inon.diagnostics.errors.items[0];
+            const error_msg = diag_err.message;
+            return try testing.expect(std.mem.containsAtLeast(u8, error_msg, 1, error_str));
+        },
+        else => |e| return e,
+    };
+    unreachable;
+}
+
 test "null value" {
     var data = try testNormal(
         \\a: null
@@ -113,6 +127,12 @@ test "string interpolation" {
 
     try expectEqualStrings("a is 10 value", data.find("b").get(.str).items);
     try expectEqualStrings("hello world", data.find("d").get(.str).items);
+}
+
+test "empty interpolation" {
+    try testError(
+        \\a: "{}"
+    , "empty expressions not allowed in string interpolation");
 }
 
 test "assign array" {
