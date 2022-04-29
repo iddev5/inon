@@ -39,6 +39,17 @@ test "null value" {
     try expect(data.find("a").is(.nulled));
 }
 
+test "trailing comma" {
+    var data = try testNormal(
+        \\a: null,
+        \\b: null,
+    );
+    defer data.deinit();
+
+    try expect(data.find("a").is(.nulled));
+    try expect(data.find("b").is(.nulled));
+}
+
 test "assign bool" {
     var data = try testNormal(
         \\a: true
@@ -190,10 +201,16 @@ test "assign map" {
         \\  test: "test"
         \\  hello: 10
         \\}
+        \\b: { a: 10, b: 20 }
     );
     defer data.deinit();
 
-    const map = data.find("a").get(.map);
-    try expectEqualStrings("test", map.get("test").?.get(.str).items);
-    try expectEqual(@as(f64, 10), map.get("hello").?.get(.num));
+    const map_a = data.find("a").get(.map);
+    const map_b = data.find("b").get(.map);
+
+    try expectEqualStrings("test", map_a.get("test").?.get(.str).items);
+    try expectEqual(@as(f64, 10), map_a.get("hello").?.get(.num));
+
+    try expectEqual(@as(f64, 10), map_b.get("a").?.get(.num));
+    try expectEqual(@as(f64, 20), map_b.get("b").?.get(.num));
 }

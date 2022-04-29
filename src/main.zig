@@ -262,6 +262,12 @@ const Parser = struct {
 
         while ((try self.peek()) != null) {
             try self.acceptTopLevelExpr(context);
+
+            if (try self.peek()) |tok| {
+                if (is_comma(tok.type)) {
+                    _ = try self.core.accept(is_comma);
+                }
+            }
         }
 
         return context.*;
@@ -281,6 +287,11 @@ const Parser = struct {
 
         while (!is_rbrac((try self.peek()).?.type)) {
             try self.acceptTopLevelExpr(&data);
+
+            const token = (try self.peek()).?;
+            if (is_comma(token.type)) {
+                _ = try self.core.accept(is_comma);
+            }
         }
 
         _ = try self.core.accept(is_rbrac);
