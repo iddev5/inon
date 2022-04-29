@@ -183,3 +183,17 @@ test "nested array" {
     }
     try expectEqual(@as(f64, 40), array[2].get(.num));
 }
+
+test "assign map" {
+    var data = try testNormal(
+        \\a: {
+        \\  test: "test"
+        \\  hello: 10
+        \\}
+    );
+    defer data.deinit();
+
+    const map = data.find("a").get(.map);
+    try expectEqualStrings("test", map.get("test").?.get(.str).items);
+    try expectEqual(@as(f64, 10), map.get("hello").?.get(.num));
+}
