@@ -398,12 +398,13 @@ const Parser = struct {
         if (raw_string) {
             while (raw_string) {
                 try str.value.str.appendSlice(str.allocator, token[2..]);
-                try str.value.str.append(str.allocator, '\n');
 
                 if (try self.peek()) |tok| {
                     if (is_string(tok.type)) {
                         token = (try self.core.accept(is_string)).text;
                         raw_string = mem.startsWith(u8, token, "\\");
+                        if (raw_string)
+                            try str.value.str.append(str.allocator, '\n');
                     } else break;
                 } else break;
             }

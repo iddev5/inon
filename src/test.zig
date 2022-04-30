@@ -123,7 +123,7 @@ test "assign string" {
     defer data.deinit();
 
     try expectEqualStrings("hello world", data.find("a").get(.str).items);
-    try expectEqualStrings("slightly\nlonger\nstring\n", data.find("b").get(.str).items);
+    try expectEqualStrings("slightly\nlonger\nstring", data.find("b").get(.str).items);
 }
 
 test "string interpolation" {
