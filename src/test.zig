@@ -140,6 +140,13 @@ test "string interpolation" {
     try expectEqualStrings("hello world", data.find("d").get(.str).items);
 }
 
+test "raw string followed by string" {
+    try testError(
+        \\a: \\Hello
+        \\"World"
+    , "expected identifier, found 'string'");
+}
+
 test "empty interpolation" {
     try testError(
         \\a: "{}"

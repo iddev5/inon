@@ -396,15 +396,16 @@ const Parser = struct {
 
         var raw_string: bool = if (mem.startsWith(u8, token, "\\")) true else false;
         if (raw_string) {
-            while (raw_string) {
+            while (true) {
                 try str.value.str.appendSlice(str.allocator, token[2..]);
 
                 if (try self.peek()) |tok| {
                     if (is_string(tok.type)) {
+                        raw_string = mem.startsWith(u8, tok.text, "\\");
+                        if (!raw_string)
+                            break;
                         token = (try self.core.accept(is_string)).text;
-                        raw_string = mem.startsWith(u8, token, "\\");
-                        if (raw_string)
-                            try str.value.str.append(str.allocator, '\n');
+                        try str.value.str.append(str.allocator, '\n');
                     } else break;
                 } else break;
             }
