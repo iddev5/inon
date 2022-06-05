@@ -363,8 +363,7 @@ const Parser = struct {
 
         return Data{ .value = .{
             .num = switch (num_type) {
-                .dec => std.fmt.parseFloat(f64, value.text) catch unreachable,
-                .hex => std.fmt.parseHexFloat(f64, value.text) catch unreachable,
+                .dec, .hex => std.fmt.parseFloat(f64, value.text) catch unreachable,
                 .bin, .oct => @intToFloat(f64, std.fmt.parseInt(i64, value.text, 0) catch unreachable),
             },
         } };
