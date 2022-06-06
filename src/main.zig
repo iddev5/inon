@@ -313,17 +313,18 @@ const Parser = struct {
             } else if (is_oct_number(token.type)) {
                 return self.acceptAtomNumber(.oct, is_oct_number);
             } else if (is_identifier(token.type)) {
-                const tok = try self.core.accept(is_identifier);
-                if (self.inon.functions.get(tok.text)) |_| {
-                    if (self.fn_nested) {
-                        try self.emitError("nested function calls has to be enclosed in parens", .{});
-                        return error.ParsingFailed;
+                if (try self.core.peek()) |tok| {
+                    if (self.inon.functions.get(tok.text)) |_| {
+                        if (self.fn_nested) {
+                            try self.emitError("nested function calls has to be enclosed in parens", .{});
+                            return error.ParsingFailed;
+                        }
+                        self.fn_nested = true;
+                        defer self.fn_nested = false;
+                        return self.acceptFunctionCall(tok, .func);
                     }
-                    self.fn_nested = true;
-                    defer self.fn_nested = false;
-                    return self.acceptFunctionCall(tok, .func);
                 }
-                return self.acceptAtomIdentifier(tok);
+                return self.acceptAtomIdentifier(try self.core.accept(is_identifier));
             } else if (is_string(token.type)) {
                 return self.acceptAtomString();
             } else if (is_lpar(token.type)) {
@@ -528,7 +529,6 @@ const Parser = struct {
         switch (fn_type) {
             .func => {
                 const tok = try self.core.accept(is_identifier);
-
                 fn_name = self.getFunctionName(tok.text);
             },
             .method => {
