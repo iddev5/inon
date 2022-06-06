@@ -14,19 +14,24 @@ pub fn main() anyerror!void {
     try Inon.Stdlib.addAll(&inon);
 
     var data = inon.parse("<demo>",
-        \\first_name: "joe"
-        \\last_name: "some {first_name} thing"
+    //\\first_name: "joe"
+    //\\last_name: "some {first_name} thing"
         \\age: 50
-        \\address: {
-        \\    street_no :: (= age 30) : 420
-        \\    street_no :: (= age 40) : 40
-        \\    street_no :: (= age 50) : 50
-        \\    street_no ?: 60
-        \\    num: * (self "street_no") 2
-        \\    city: "nyc"
-        \\}
-        \\phone_nos: [100, 200, 300]
-        \\second_no: index phone_nos 1
+        //\\is :: (50 = (25 * 2)) : false
+
+        \\is: if (age = 50) 20
+        //is: if (age is_null) 25
+
+        //\\address: {
+        //\\    street_no :: (= age 30) : 420
+        //\\    street_no :: (= age 40) : 40
+        //\\    street_no :: (= age 50) : 50
+        //\\    street_no ?: 60
+        //\\    num: * (self "street_no") 2
+        //\\    city: "nyc"
+        //\\}
+        //\\phone_nos: [100, 200, 300]
+        //\\second_no: index phone_nos 1
     ) catch |err| switch (err) {
         error.ParsingFailed => return try inon.renderError(stdout),
         else => |e| return e,

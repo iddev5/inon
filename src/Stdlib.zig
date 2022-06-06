@@ -43,6 +43,15 @@ const Lib = struct {
         const data2 = params[1];
         return Data{ .value = .{ .bool = data1.eql(&data2) } };
     }
+
+    fn _if(_: *Inon, params: []Data) !Data {
+        const data1 = params[0];
+        const data2 = params[1];
+
+        if (!data1.is(.bool))
+            return Data.null_data;
+        return if (data1.get(.bool)) data2 else Data.null_data;
+    }
 };
 
 pub fn addAll(inon: *Inon) !void {
@@ -53,6 +62,7 @@ pub fn addAll(inon: *Inon) !void {
         .{ .name = "self", .params = &.{.str}, .run = Lib.self },
         .{ .name = "index", .params = &.{ null, .num }, .run = Lib.index },
         .{ .name = "=", .params = &.{ null, null }, .run = Lib.eql },
+        .{ .name = "if", .params = &.{ .bool, null }, .run = Lib._if },
     };
 
     for (functions) |f| {
