@@ -321,15 +321,21 @@ const Parser = struct {
                     }
                     self.fn_nested = true;
                     defer self.fn_nested = false;
-                    return self.acceptFunctionCall(tok);
+                    return self.acceptFunctionCall(tok, .func);
                 }
                 return self.acceptAtomIdentifier(tok);
             } else if (is_string(token.type)) {
                 return self.acceptAtomString();
             } else if (is_lpar(token.type)) {
                 _ = (try self.core.accept(is_lpar));
-                const tok = try self.core.accept(is_identifier);
-                const atom = self.acceptFunctionCall(tok);
+                var atom: Data = undefined;
+                if (try self.core.peek()) |tok| {
+                    if (is_identifier(tok.type) and self.inon.functions.get(tok.text) != null) {
+                        atom = try self.acceptFunctionCall(tok, .func);
+                    } else {
+                        atom = try self.acceptFunctionCall(tok, .method);
+                    }
+                }
                 _ = (try self.core.accept(is_rpar));
                 return atom;
             } else if (is_lsqr(token.type)) {
@@ -504,21 +510,33 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptFunctionCall(self: *Self, token: Tokenizer.Token) ParseError!Data {
+    fn getFunctionName(_: *Self, text: []const u8) []const u8 {
+        if (mem.startsWith(u8, text, "'"))
+            return text[1 .. text.len - 1];
+        return text;
+    }
+
+    fn acceptFunctionCall(self: *Self, _: Tokenizer.Token, fn_type: enum { func, method }) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const fn_name = blk: {
-            const text = token.text;
-            if (mem.startsWith(u8, text, "'")) {
-                break :blk text[1 .. text.len - 1];
-            } else {
-                break :blk text;
-            }
-        };
+        var fn_name: []const u8 = undefined;
 
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
         defer args.deinit();
+
+        switch (fn_type) {
+            .func => {
+                const tok = try self.core.accept(is_identifier);
+
+                fn_name = self.getFunctionName(tok.text);
+            },
+            .method => {
+                const arg_first = try self.acceptAtom();
+                try args.value.array.append(args.allocator, arg_first);
+                fn_name = self.getFunctionName((try self.core.accept(is_identifier)).text);
+            },
+        }
 
         const func = if (self.inon.functions.get(fn_name)) |func| func else {
             try self.emitError("function '{s}' has not been defined", .{fn_name});
@@ -526,7 +544,7 @@ const Parser = struct {
         };
         const param_count = func.params.len;
 
-        var i: usize = 0;
+        var i: usize = args.value.array.items.len;
         while (i < param_count) : (i += 1) {
             if (try self.peek()) |_| {
                 const arg = try self.acceptAtom();
