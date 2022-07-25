@@ -214,3 +214,19 @@ test "assign map" {
     try expectEqual(@as(f64, 10), map_b.get("a").?.get(.num));
     try expectEqual(@as(f64, 20), map_b.get("b").?.get(.num));
 }
+
+test "value access" {
+    var data = try testNormal(
+        \\a: 10
+        \\b: { a: 10, b: a }
+    );
+    defer data.deinit();
+
+    const num_a = data.find("a").get(.num);
+    const map_b = data.find("b").get(.map);
+
+    try expectEqual(@as(f64, 10), num_a);
+
+    try expectEqual(@as(f64, 10), map_b.get("a").?.get(.num));
+    try expectEqual(num_a, map_b.get("b").?.get(.num));
+}
