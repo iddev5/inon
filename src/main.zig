@@ -323,7 +323,7 @@ const Parser = struct {
                     token.text,
                     value,
                 );
-                return value;
+                return Data.null_data;
             }
         }
 
