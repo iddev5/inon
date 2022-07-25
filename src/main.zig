@@ -137,7 +137,8 @@ const Parser = struct {
         };
 
         parser.inon.current_context = &parser.inon.context;
-        return parser.acceptObjectNoCtx(&inon.context);
+        try parser.acceptObjectNoCtx();
+        return inon.context;
     }
 
     core: ParserCore,
@@ -192,76 +193,12 @@ const Parser = struct {
         return try acceptAtom(self);
     }
 
-    fn acceptTopLevelExpr(self: *Self, context: *Data) ParseError!void {
-        const state = self.core.saveState();
-        errdefer self.core.restoreState(state);
-
-        const identifier = (self.core.accept(is_identifier) catch |err| switch (err) {
-            error.UnexpectedToken => {
-                const tok_type = @tagName((self.peek() catch unreachable).?.type);
-                try self.emitError("expected identifier, found '{s}'", .{tok_type});
-                return error.ParsingFailed;
-            },
-            else => |e| return e,
-        }).text;
-
-        var prev_data = context.findEx(identifier);
-        const prev_exists = !prev_data.is(.nulled);
-
-        const val = blk: {
-            if (try self.peek()) |token| {
-                if (is_dualcolon(token.type)) {
-                    _ = try self.core.accept(is_dualcolon);
-                    var cond = try acceptAtom(self);
-                    defer cond.deinit();
-
-                    if (cond.is(.bool)) {
-                        var expr = try acceptAssignment(self);
-                        defer expr.deinit();
-                        if (cond.get(.bool)) {
-                            if (prev_exists)
-                                prev_data.deinit();
-                            break :blk try expr.copy(self.inon.allocator);
-                        } else {
-                            return;
-                        }
-                    }
-
-                    try self.emitError("expected condition of type 'bool'", .{});
-                    return error.ParsingFailed;
-                } else if (is_optcolon(token.type)) {
-                    _ = try self.core.accept(is_optcolon);
-                    var value = try self.acceptAtom();
-
-                    if (prev_exists) {
-                        value.deinit();
-                        return;
-                    }
-
-                    break :blk value;
-                } else if (is_colon(token.type)) {
-                    if (prev_exists)
-                        prev_data.deinit();
-                    break :blk try acceptAssignment(self);
-                } else {
-                    try self.emitError("expected '::', '?:' or ':' after identifier", .{});
-                    return error.ParsingFailed;
-                }
-            } else {
-                try self.emitError("found stray identifier", .{});
-                return error.ParsingFailed;
-            }
-        };
-
-        try context.value.map.put(self.inon.allocator, identifier, val);
-    }
-
-    fn acceptObjectNoCtx(self: *Self, context: *Data) ParseError!Data {
+    fn acceptObjectNoCtx(self: *Self) ParseError!void {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
         while ((try self.peek()) != null) {
-            try self.acceptTopLevelExpr(context);
+            _ = try self.acceptAtom();
 
             if (try self.peek()) |tok| {
                 if (is_comma(tok.type)) {
@@ -269,8 +206,6 @@ const Parser = struct {
                 }
             }
         }
-
-        return context.*;
     }
 
     fn acceptObject(self: *Self) ParseError!Data {
@@ -286,7 +221,7 @@ const Parser = struct {
         defer self.inon.current_context = old_context;
 
         while (!is_rbrac((try self.peek()).?.type)) {
-            try self.acceptTopLevelExpr(&data);
+            _ = try self.acceptAtom();
 
             const token = (try self.peek()).?;
             if (is_comma(token.type)) {
@@ -373,7 +308,27 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const data = self.inon.context.findEx(token.text);
+        if (try self.core.peek()) |tok| {
+            if (is_colon(tok.type)) {
+                _ = try self.core.accept(is_colon);
+
+                // Check for the data in the present context
+                var data = self.inon.current_context.findEx(token.text);
+                if (!data.is(.nulled))
+                    data.deinit();
+
+                const value = try self.acceptAtom();
+                try self.inon.current_context.value.map.put(
+                    self.inon.allocator,
+                    token.text,
+                    value,
+                );
+                return value;
+            }
+        }
+
+        // Check for the data in global context, because inon always looks for global variables in any scope
+        var data = self.inon.context.findEx(token.text);
         if (data.is(.nulled)) {
             try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
             return error.ParsingFailed;
