@@ -199,7 +199,7 @@ const Parser = struct {
         var data = Data.null_data;
 
         while ((try self.peek()) != null) {
-            const val = try self.acceptAtom();
+            const val = try self.acceptAtom(self.inon.current_context);
             if (!val.is(.nulled)) {
                 data.deinit();
                 data = val;
@@ -223,12 +223,8 @@ const Parser = struct {
         var data = Data{ .value = .{ .map = .{} }, .allocator = self.inon.allocator };
         errdefer data.deinit();
 
-        const old_context = self.inon.current_context;
-        self.inon.current_context = &data;
-        defer self.inon.current_context = old_context;
-
         while (!is_rbrac((try self.peek()).?.type)) {
-            const val = try self.acceptAtom();
+            const val = try self.acceptAtom(&data);
             if (!val.is(.nulled)) {
                 data.deinit();
                 data = val;
@@ -245,7 +241,7 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptAtom(self: *Self) ParseError!Data {
+    fn acceptAtom(self: *Self, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -267,19 +263,19 @@ const Parser = struct {
                     }
                     self.fn_nested = true;
                     defer self.fn_nested = false;
-                    return self.acceptFunctionCall(tok);
+                    return self.acceptFunctionCall(tok, context);
                 }
-                return self.acceptAtomIdentifier(tok);
+                return self.acceptAtomIdentifier(tok, context);
             } else if (is_string(token.type)) {
                 return self.acceptAtomString();
             } else if (is_lpar(token.type)) {
                 _ = (try self.core.accept(is_lpar));
                 const tok = try self.core.accept(is_identifier);
-                const atom = self.acceptFunctionCall(tok);
+                const atom = self.acceptFunctionCall(tok, context);
                 _ = (try self.core.accept(is_rpar));
                 return atom;
             } else if (is_lsqr(token.type)) {
-                return self.acceptAtomList();
+                return self.acceptAtomList(context);
             } else if (is_lbrac(token.type)) {
                 return self.acceptObject();
             } else if (is_true(token.type)) {
@@ -315,7 +311,7 @@ const Parser = struct {
         } };
     }
 
-    fn acceptAtomIdentifier(self: *Self, token: Tokenizer.Token) ParseError!Data {
+    fn acceptAtomIdentifier(self: *Self, token: Tokenizer.Token, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -328,8 +324,8 @@ const Parser = struct {
                 if (!data.is(.nulled))
                     data.deinit();
 
-                const value = try self.acceptAtom();
-                try self.inon.current_context.value.map.put(
+                const value = try self.acceptAtom(context);
+                try context.value.map.put(
                     self.inon.allocator,
                     token.text,
                     value,
@@ -438,7 +434,7 @@ const Parser = struct {
         return str;
     }
 
-    fn acceptAtomList(self: *Self) ParseError!Data {
+    fn acceptAtomList(self: *Self, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -452,7 +448,7 @@ const Parser = struct {
                 break;
             }
 
-            try data.value.array.append(data.allocator, try self.acceptAtom());
+            try data.value.array.append(data.allocator, try self.acceptAtom(context));
 
             const token = (try self.peek()).?;
             if (!is_rsqr(token.type)) {
@@ -470,7 +466,7 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptFunctionCall(self: *Self, token: Tokenizer.Token) ParseError!Data {
+    fn acceptFunctionCall(self: *Self, token: Tokenizer.Token, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -495,7 +491,7 @@ const Parser = struct {
         var i: usize = 0;
         while (i < param_count) : (i += 1) {
             if (try self.peek()) |_| {
-                const arg = try self.acceptAtom();
+                const arg = try self.acceptAtom(context);
                 try args.value.array.append(args.allocator, arg);
             } else break;
         }
