@@ -11,6 +11,7 @@ allocator: Allocator,
 functions: FuncList,
 context: Data,
 current_context: *Data,
+result: Data,
 diagnostics: ptk.Diagnostics,
 
 const Message = struct {
@@ -39,6 +40,7 @@ pub fn init(allocator: Allocator) Inon {
         .functions = .{},
         .context = .{ .value = .{ .map = .{} }, .allocator = allocator },
         .current_context = undefined,
+        .result = undefined,
     };
 }
 
@@ -46,6 +48,7 @@ pub fn deinit(inon: *Inon) void {
     inon.diagnostics.deinit();
     inon.functions.deinit(inon.allocator);
     inon.context.deinit();
+    inon.result.deinit();
 }
 
 pub fn parse(inon: *Inon, name: []const u8, src: []const u8) !Data {
@@ -136,9 +139,13 @@ const Parser = struct {
             .inon = inon,
         };
 
-        parser.inon.current_context = &parser.inon.context;
-        try parser.acceptObjectNoCtx();
-        return inon.context;
+        inon.current_context = &inon.context;
+        inon.result = try parser.acceptObjectNoCtx();
+
+        return if (!inon.result.is(.nulled))
+            return inon.result
+        else
+            inon.context;
     }
 
     core: ParserCore,
@@ -193,12 +200,18 @@ const Parser = struct {
         return try acceptAtom(self);
     }
 
-    fn acceptObjectNoCtx(self: *Self) ParseError!void {
+    fn acceptObjectNoCtx(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
+        var data = Data.null_data;
+
         while ((try self.peek()) != null) {
-            _ = try self.acceptAtom();
+            const val = try self.acceptAtom();
+            if (!val.is(.nulled)) {
+                data.deinit();
+                data = val;
+            }
 
             if (try self.peek()) |tok| {
                 if (is_comma(tok.type)) {
@@ -206,6 +219,8 @@ const Parser = struct {
                 }
             }
         }
+
+        return data;
     }
 
     fn acceptObject(self: *Self) ParseError!Data {
@@ -221,7 +236,11 @@ const Parser = struct {
         defer self.inon.current_context = old_context;
 
         while (!is_rbrac((try self.peek()).?.type)) {
-            _ = try self.acceptAtom();
+            const val = try self.acceptAtom();
+            if (!val.is(.nulled)) {
+                data.deinit();
+                data = val;
+            }
 
             const token = (try self.peek()).?;
             if (is_comma(token.type)) {
