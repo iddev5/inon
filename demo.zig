@@ -18,10 +18,10 @@ pub fn main() anyerror!void {
         \\last_name: "some {first_name} thing"
         \\age: 50
         \\address: {
-        \\    street_no :: (= age 30) : 420
-        \\    street_no :: (= age 40) : 40
-        \\    street_no :: (= age 50) : 50
-        \\    street_no ?: 60
+        \\    street_no: if (= age 30) 420
+        \\    street_no: if (= age 40) 40
+        \\    street_no: if (= age 50) 50
+        \\    street_no: ifnull age 60
         \\    num: * (self "street_no") 2
         \\    city: "nyc"
         \\}
