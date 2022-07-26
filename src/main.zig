@@ -192,14 +192,6 @@ const Parser = struct {
         try self.inon.diagnostics.emit(state.location, .@"error", format, args);
     }
 
-    fn acceptAssignment(self: *Self) ParseError!Data {
-        const state = self.core.saveState();
-        errdefer self.core.restoreState(state);
-
-        _ = try self.core.accept(is_colon);
-        return try acceptAtom(self);
-    }
-
     fn acceptObjectNoCtx(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
