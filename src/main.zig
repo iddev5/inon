@@ -406,7 +406,13 @@ const Parser = struct {
                             return error.ParsingFailed;
                         }
 
+                        // TODO: Allow complete expressions in place of identifier
+                        // Need independent lexel and parser support
                         const data = context.findExRecursive(sub_name);
+                        if (data.is(.nulled)) {
+                            try self.emitError("undeclared identifier '{s}' referenced", .{sub_name});
+                            return error.ParsingFailed;
+                        }
 
                         const writer = str.value.str.writer(str.allocator);
                         try data.serialize(0, writer, .{

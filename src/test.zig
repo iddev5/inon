@@ -179,6 +179,12 @@ test "unmatched interpolation" {
     , "stray '}' outside of string interpolation");
 }
 
+test "undeclared interpolation" {
+    try testError(
+        \\a: "{x}"
+    , "undeclared identifier 'x' referenced");
+}
+
 test "assign array" {
     var data = try testNormal(
         \\a: [10, true, "test"]
