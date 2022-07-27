@@ -140,6 +140,20 @@ test "string interpolation" {
     try expectEqualStrings("hello world", data.find("d").get(.str).items);
 }
 
+test "nested string interpolation" {
+    var data = try testNormal(
+        \\a: 10
+        \\b: {
+        \\    a: "hello"
+        \\    b: "{a} world"
+        \\}
+    );
+    defer data.deinit();
+
+    const map_b = data.find("b").get(.map);
+    try expectEqualStrings("hello world", map_b.get("b").?.get(.str).items);
+}
+
 test "empty interpolation" {
     try testError(
         \\a: "{}"
