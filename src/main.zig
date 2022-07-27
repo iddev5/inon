@@ -215,12 +215,16 @@ const Parser = struct {
         return data;
     }
 
-    fn acceptObject(self: *Self) ParseError!Data {
+    fn acceptObject(self: *Self, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
         _ = try self.core.accept(is_lbrac);
-        var data = Data{ .value = .{ .map = .{} }, .allocator = self.inon.allocator };
+        var data = Data{
+            .value = .{ .map = .{} },
+            .allocator = self.inon.allocator,
+            .parent = context,
+        };
         errdefer data.deinit();
 
         while (!is_rbrac((try self.peek()).?.type)) {
@@ -267,7 +271,7 @@ const Parser = struct {
                 }
                 return self.acceptAtomIdentifier(tok, context);
             } else if (is_string(token.type)) {
-                return self.acceptAtomString();
+                return self.acceptAtomString(context);
             } else if (is_lpar(token.type)) {
                 _ = (try self.core.accept(is_lpar));
                 const tok = try self.core.accept(is_identifier);
@@ -277,7 +281,7 @@ const Parser = struct {
             } else if (is_lsqr(token.type)) {
                 return self.acceptAtomList(context);
             } else if (is_lbrac(token.type)) {
-                return self.acceptObject();
+                return self.acceptObject(context);
             } else if (is_true(token.type)) {
                 _ = (try self.core.accept(is_true));
                 return Data{ .value = .{ .bool = true } };
@@ -320,7 +324,7 @@ const Parser = struct {
                 _ = try self.core.accept(is_colon);
 
                 // Check for the data in the present context
-                var data = self.inon.current_context.findEx(token.text);
+                var data = context.findEx(token.text);
                 if (!data.is(.nulled))
                     data.deinit();
 
@@ -334,8 +338,7 @@ const Parser = struct {
             }
         }
 
-        // Check for the data in global context, because inon always looks for global variables in any scope
-        var data = self.inon.context.findEx(token.text);
+        var data = context.findExRecursive(token.text);
         if (data.is(.nulled)) {
             try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
             return error.ParsingFailed;
@@ -344,7 +347,7 @@ const Parser = struct {
         return data.copy(self.inon.allocator);
     }
 
-    fn acceptAtomString(self: *Self) ParseError!Data {
+    fn acceptAtomString(self: *Self, context: *Data) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
@@ -403,7 +406,7 @@ const Parser = struct {
                             return error.ParsingFailed;
                         }
 
-                        const data = self.inon.context.findEx(sub_name);
+                        const data = context.findExRecursive(sub_name);
 
                         const writer = str.value.str.writer(str.allocator);
                         try data.serialize(0, writer, .{
