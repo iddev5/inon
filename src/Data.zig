@@ -75,7 +75,7 @@ pub fn findEx(self: *const Data, name: []const u8) Data {
 
 pub fn findExRecursive(self: *const Data, name: []const u8) Data {
     return switch (self.value) {
-        .map => self.value.map.get(name) orelse if (self.parent) |parent| parent.findEx(name) else Data.null_data,
+        .map => self.value.map.get(name) orelse if (self.parent) |parent| parent.findExRecursive(name) else Data.null_data,
         else => unreachable,
     };
 }

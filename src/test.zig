@@ -230,3 +230,32 @@ test "value access" {
     try expectEqual(@as(f64, 10), map_b.get("a").?.get(.num));
     try expectEqual(map_b.get("a").?.get(.num), map_b.get("b").?.get(.num));
 }
+
+test "nested value access" {
+    var data = try testNormal(
+        \\a: 10
+        \\b: {
+        \\    b: 20,
+        \\    c: {
+        \\        c: 30
+        \\        d: c
+        \\        e: b
+        \\        f: a
+        \\    }
+        \\}
+    );
+    defer data.deinit();
+
+    const num_a = data.find("a").get(.num);
+    const map_b = data.find("b").get(.map);
+
+    try expectEqual(@as(f64, 10), num_a);
+    try expectEqual(@as(f64, 20), map_b.get("b").?.get(.num));
+
+    const map_c = map_b.get("c").?.get(.map);
+
+    try expectEqual(@as(f64, 30), map_c.get("c").?.get(.num));
+    try expectEqual(map_c.get("c").?.get(.num), map_c.get("d").?.get(.num));
+    try expectEqual(map_b.get("b").?.get(.num), map_c.get("e").?.get(.num));
+    try expectEqual(num_a, map_c.get("f").?.get(.num));
+}
