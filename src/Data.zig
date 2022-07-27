@@ -13,6 +13,7 @@ value: union(Type) {
     nulled: void,
 } = undefined,
 allocator: Allocator = undefined,
+parent: ?*Data = null,
 
 pub const String = std.ArrayListUnmanaged(u8);
 pub const Array = std.ArrayListUnmanaged(Data);
@@ -68,6 +69,13 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
 pub fn findEx(self: *const Data, name: []const u8) Data {
     return switch (self.value) {
         .map => if (self.value.map.get(name)) |data| data else Data.null_data,
+        else => unreachable,
+    };
+}
+
+pub fn findExRecursive(self: *const Data, name: []const u8) Data {
+    return switch (self.value) {
+        .map => self.value.map.get(name) orelse if (self.parent) |parent| parent.findEx(name) else Data.null_data,
         else => unreachable,
     };
 }
