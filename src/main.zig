@@ -28,7 +28,7 @@ pub const FuncFnType = fn (inon: *Inon, params: []Data) Error!Data;
 pub const FuncType = struct {
     name: []const u8,
     params: []const ?Data.Type,
-    run: FuncFnType,
+    run: *const FuncFnType,
 };
 pub const FuncList = std.StringArrayHashMapUnmanaged(FuncType);
 
@@ -83,9 +83,9 @@ const Parser = struct {
         fn_name,
         whitespace,
         comment,
-        @"true",
-        @"false",
-        @"null",
+        true,
+        false,
+        null,
         @"::",
         @"?:",
         @":",
@@ -107,9 +107,9 @@ const Parser = struct {
         Pattern.create(.bin_number, binMatcher),
         Pattern.create(.oct_number, octaMatcher),
         Pattern.create(.string, stringMatcher),
-        Pattern.create(.@"true", matchers.literal("true")),
-        Pattern.create(.@"false", matchers.literal("false")),
-        Pattern.create(.@"null", matchers.literal("null")),
+        Pattern.create(.true, matchers.literal("true")),
+        Pattern.create(.false, matchers.literal("false")),
+        Pattern.create(.null, matchers.literal("null")),
         Pattern.create(.whitespace, matchers.takeAnyOf(" \n\r\t")),
         Pattern.create(.comment, commentMatcher),
         Pattern.create(.@"::", matchers.literal("::")),
@@ -152,9 +152,9 @@ const Parser = struct {
     const is_oct_number = ruleset.is(.oct_number);
     const is_identifier = ruleset.is(.identifier);
     const is_string = ruleset.is(.string);
-    const is_true = ruleset.is(.@"true");
-    const is_false = ruleset.is(.@"false");
-    const is_null = ruleset.is(.@"null");
+    const is_true = ruleset.is(.true);
+    const is_false = ruleset.is(.false);
+    const is_null = ruleset.is(.null);
     const is_dualcolon = ruleset.is(.@"::");
     const is_optcolon = ruleset.is(.@"?:");
     const is_colon = ruleset.is(.@":");
@@ -344,7 +344,7 @@ const Parser = struct {
                 return Data{ .value = .{ .bool = false } };
             } else if (is_null(token.type)) {
                 _ = (try self.core.accept(is_null));
-                return Data{ .value = .{ .nulled = .{} } };
+                return Data.null_data;
             } else {
                 try self.emitError("expected expression, literal or function call", .{});
                 return error.ParsingFailed;
@@ -542,7 +542,7 @@ const Parser = struct {
         }
 
         // Validate argument type
-        for (func.params) |param, index| {
+        for (func.params, 0..) |param, index| {
             if (param) |par| {
                 const arg = args.get(.array).items[index];
                 if (!arg.is(par)) {
@@ -727,7 +727,7 @@ fn stringMatcher(str: []const u8) ?usize {
 fn identifierMatcher(str: []const u8) ?usize {
     const first_char = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ++ "!#$%&'*+-./;<=>@\\^_`|~";
     const all_chars = first_char ++ "0123456789";
-    for (str) |c, i| {
+    for (str, 0..) |c, i| {
         if (std.mem.indexOfScalar(u8, if (i > 0) all_chars else first_char, c) == null) {
             return i;
         }

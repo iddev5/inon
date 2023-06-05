@@ -27,7 +27,7 @@ pub const Type = enum(u8) {
     nulled,
 };
 
-pub const null_data = Data{ .value = .{ .nulled = .{} } };
+pub const null_data = Data{ .value = .{ .nulled = void{} } };
 
 pub fn deinit(self: *Data) void {
     switch (self.value) {
@@ -230,7 +230,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
 pub fn serializeToJson(self: *Data, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
     // Depth 10 should be enough?
     var jw = std.json.writeStream(writer, 10);
-    jw.whitespace.indent.Space = @intCast(u8, indent);
+    jw.whitespace.indent.space = @intCast(u8, indent);
     try serializeJsonInternal(self, &jw);
 }
 

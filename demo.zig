@@ -33,7 +33,7 @@ pub fn main() anyerror!void {
     };
 
     try stdout.print("Deserialized: \n\n", .{});
-    try stdout.print("{s}\n\n", .{@TypeOf(data.value.map)});
+    try stdout.print("{}\n\n", .{@TypeOf(data.value.map)});
 
     try stdout.print("Serialized: \n\n", .{});
     try inon.serialize(&data, stdout);
