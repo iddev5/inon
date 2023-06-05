@@ -1,5 +1,5 @@
 const std = @import("std");
-const Inon = @import("src/main.zig");
+const Inon = @import("inon");
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

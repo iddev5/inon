@@ -1,6 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
-const Inon = @import("main.zig");
+const Inon = @import("inon");
 
 const expect = testing.expect;
 const expectEqual = testing.expectEqual;
