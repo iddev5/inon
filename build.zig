@@ -15,17 +15,31 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const exe = b.addExecutable(.{
-        .name = "inon",
+    // Demo application
+    const demo = b.addExecutable(.{
+        .name = "inon-demo",
         .root_source_file = .{ .path = "demo.zig" },
         .optimize = optimize,
     });
-    exe.addModule("inon", inon_mod);
-    b.installArtifact(exe);
+    demo.addModule("inon", inon_mod);
+    b.installArtifact(demo);
 
-    const run_step = b.step("run", "Run the demo");
-    run_step.dependOn(&b.addRunArtifact(exe).step);
+    const run_step = b.step("run-demo", "Run the demo");
+    run_step.dependOn(&b.addRunArtifact(demo).step);
 
+    // Repl application
+    const repl = b.addExecutable(.{
+        .name = "inon-repl",
+        .root_source_file = .{ .path = "repl.zig" },
+        .optimize = optimize,
+    });
+    repl.addModule("inon", inon_mod);
+    b.installArtifact(repl);
+
+    const repl_step = b.step("run-repl", "Run the repl");
+    repl_step.dependOn(&b.addRunArtifact(repl).step);
+
+    // Tests
     const tests = b.addTest(.{
         .root_source_file = .{ .path = "src/test.zig" },
         .optimize = optimize,

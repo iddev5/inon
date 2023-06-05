@@ -66,6 +66,8 @@ pub fn serializeToJson(inon: *Inon, data: *Data, writer: anytype) @TypeOf(writer
 
 pub fn renderError(inon: *Inon, writer: anytype) !void {
     try inon.diagnostics.print(writer);
+    inon.diagnostics.deinit();
+    inon.diagnostics = ptk.Diagnostics.init(inon.allocator);
 }
 
 const matchers = ptk.matchers;
