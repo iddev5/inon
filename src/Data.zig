@@ -180,7 +180,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
 
                 // Write value
                 try writer.writeByteNTimes(' ', start + indent);
-                try arr.items[id].serializeInternal(start, indent, writer, options);
+                try arr.items[id].serializeInternal(start + indent, indent, writer, options);
 
                 // If not last element then write a comma
                 if (id != arr.items.len - 1)
