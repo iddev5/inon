@@ -40,9 +40,14 @@ pub fn deinit(self: *Data) void {
             self.value.array.deinit(self.allocator);
         },
         .map => {
-            var iter = self.value.map.valueIterator();
-            while (iter.next()) |value| {
-                value.*.deinit();
+            var iter = self.value.map.iterator();
+            while (iter.next()) |entry| {
+                var key = entry.key_ptr.*;
+                var value = entry.value_ptr.*;
+                // TODO: this would panic in case the user is manually adding the field
+                // without allocating it.
+                self.allocator.free(key);
+                value.deinit();
             }
             self.value.map.deinit(self.allocator);
         },

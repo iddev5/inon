@@ -255,7 +255,11 @@ const Parser = struct {
             }
         };
 
-        try context.value.map.put(self.inon.allocator, identifier, val);
+        try context.value.map.put(
+            self.inon.allocator,
+            try context.allocator.dupe(u8, identifier),
+            val,
+        );
     }
 
     fn acceptObjectNoCtx(self: *Self, context: *Data) ParseError!Data {
