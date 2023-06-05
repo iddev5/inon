@@ -34,6 +34,6 @@ jobs:
             - name: Build
               run: zig build
             - name: Run demo
-              run: zig build run
+              run: zig build run-demo
             - name: Test
               run: zig build test
