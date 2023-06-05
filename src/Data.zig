@@ -106,8 +106,34 @@ pub fn eql(self: *const Data, data: *const Data) bool {
         .bool => self.value.bool == data.value.bool,
         .num => self.value.num == data.value.num,
         .str => std.mem.eql(u8, self.value.str.items, data.value.str.items),
-        .array => false, // TODO
-        .map => false, // TODO
+        .array => blk: {
+            const len = self.value.array.items.len;
+            if (len != data.value.array.items.len)
+                break :blk false;
+
+            var i: usize = 0;
+            while (i < len) : (i += 1) {
+                if (!self.value.array.items[i].eql(&data.value.array.items[i]))
+                    break :blk false;
+            }
+
+            break :blk true;
+        },
+        .map => blk: {
+            if (self.value.map.size != data.value.map.size)
+                break :blk false;
+
+            var iter = self.value.map.iterator();
+            while (iter.next()) |entry| {
+                const key = entry.key_ptr.*;
+                const value = entry.value_ptr.*;
+
+                if (!value.eql(&data.findEx(key)))
+                    break :blk false;
+            }
+
+            break :blk true;
+        },
         .nulled => true,
     };
 }
