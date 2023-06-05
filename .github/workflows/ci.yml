@@ -31,11 +31,9 @@ jobs:
               uses: goto-bus-stop/setup-zig@v1
               with:
                   version: master
-            - name: Setup Gyro
-              uses: mattnite/setup-gyro@v1
             - name: Build
-              run: gyro build
+              run: zig build
             - name: Run demo
-              run: gyro build run
+              run: zig build run
             - name: Test
-              run: gyro build test
+              run: zig build test
