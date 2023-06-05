@@ -137,7 +137,11 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
-                try data.value.map.put(allocator, key, try value.copy(allocator));
+                try data.value.map.put(
+                    allocator,
+                    try allocator.dupe(u8, key),
+                    try value.copy(allocator),
+                );
             }
 
             return data;
