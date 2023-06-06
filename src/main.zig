@@ -494,13 +494,11 @@ const Parser = struct {
 
             try data.value.array.append(data.allocator, try self.acceptAtom());
 
-            const token = (try self.peek()).?;
-            if (!is_rsqr(token.type)) {
-                if (is_comma(token.type)) {
-                    _ = try self.core.accept(is_comma);
-                } else {
-                    try self.emitError("expected ',' or ']' with list", .{});
-                    return error.ParsingFailed;
+            if (try self.peek()) |next| {
+                if (!is_rsqr(next.type)) {
+                    if (is_comma(next.type)) {
+                        _ = try self.core.accept(is_comma);
+                    }
                 }
             }
         }
