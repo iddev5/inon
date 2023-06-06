@@ -216,6 +216,16 @@ const Parser = struct {
         };
     }
 
+    fn optional(self: *Self, comptime rule: ParserCore.Rule) !void {
+        if (try self.peek()) |token| {
+            if (rule(token.type)) {
+                // NOTE: may need to use self.accept instead to prevent error.EndOfStream
+                // Not sure if that is even reachable from this path.
+                _ = try self.core.accept(rule);
+            }
+        }
+    }
+
     fn emitError(self: *Self, comptime format: []const u8, args: anytype) !void {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
@@ -298,12 +308,7 @@ const Parser = struct {
 
         while ((try self.peek()) != null) {
             try self.acceptTopLevelExpr(context);
-
-            if (try self.peek()) |tok| {
-                if (is_comma(tok.type)) {
-                    _ = try self.core.accept(is_comma);
-                }
-            }
+            try self.optional(is_comma);
         }
 
         return context.*;
@@ -321,13 +326,12 @@ const Parser = struct {
         self.inon.current_context = &data;
         defer self.inon.current_context = old_context;
 
-        while (!is_rbrac((try self.peek()).?.type)) {
-            try self.acceptTopLevelExpr(&data);
+        while (try self.peek()) |token| {
+            if (is_rbrac(token.type))
+                break;
 
-            const token = (try self.peek()).?;
-            if (is_comma(token.type)) {
-                _ = try self.core.accept(is_comma);
-            }
+            try self.acceptTopLevelExpr(&data);
+            try self.optional(is_comma);
         }
 
         _ = try self.accept(is_rbrac);
@@ -523,14 +527,7 @@ const Parser = struct {
             }
 
             try data.value.array.append(data.allocator, try self.acceptAtom());
-
-            if (try self.peek()) |next| {
-                if (!is_rsqr(next.type)) {
-                    if (is_comma(next.type)) {
-                        _ = try self.core.accept(is_comma);
-                    }
-                }
-            }
+            try self.optional(is_comma);
         }
 
         _ = try self.accept(is_rsqr);
