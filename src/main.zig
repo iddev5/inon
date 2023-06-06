@@ -179,6 +179,43 @@ const Parser = struct {
         };
     }
 
+    fn rulesetName(comptime rule: ParserCore.Rule) []const u8 {
+        return switch (rule) {
+            is_number => "number",
+            is_identifier => "identifier",
+            is_string => "string",
+            is_lpar => "(",
+            is_rpar => ")",
+            is_lbrac => "{",
+            is_rbrac => "}",
+            is_comma => ",",
+            is_lsqr => "[",
+            is_rsqr => "]",
+            else => "unknown",
+        };
+    }
+
+    fn accept(self: *Self, comptime rule: ParserCore.Rule) !Tokenizer.Token {
+        const name = rulesetName(rule);
+        return self.core.accept(rule) catch |err| switch (err) {
+            error.UnexpectedToken => {
+                try self.emitError("expected '{s}', found '{s}'", .{
+                    name,
+                    @tagName((self.peek() catch unreachable).?.type),
+                });
+                return error.ParsingFailed;
+            },
+            error.EndOfStream => {
+                try self.emitError("unexpected end of stream, wanted '{s}'", .{name});
+                return error.ParsingFailed;
+            },
+            error.UnexpectedCharacter => {
+                try self.emitError("found unknown character", .{});
+                return error.ParsingFailed;
+            },
+        };
+    }
+
     fn emitError(self: *Self, comptime format: []const u8, args: anytype) !void {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
@@ -198,14 +235,7 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const identifier = (self.core.accept(is_identifier) catch |err| switch (err) {
-            error.UnexpectedToken => {
-                const tok_type = @tagName((self.peek() catch unreachable).?.type);
-                try self.emitError("expected identifier, found '{s}'", .{tok_type});
-                return error.ParsingFailed;
-            },
-            else => |e| return e,
-        }).text;
+        const identifier = (try self.accept(is_identifier)).text;
 
         var prev_data = context.findEx(identifier);
         const prev_exists = !prev_data.is(.nulled);
@@ -300,7 +330,7 @@ const Parser = struct {
             }
         }
 
-        _ = try self.core.accept(is_rbrac);
+        _ = try self.accept(is_rbrac);
 
         return data;
     }
@@ -503,7 +533,7 @@ const Parser = struct {
             }
         }
 
-        _ = try self.core.accept(is_rsqr);
+        _ = try self.accept(is_rsqr);
 
         return data;
     }
