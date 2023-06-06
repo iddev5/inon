@@ -391,7 +391,8 @@ const Parser = struct {
             }
         }
 
-        unreachable;
+        try self.emitError("unexpected end of file, expected expression", .{});
+        return error.ParsingFailed;
     }
 
     const AtomNumType = enum { dec, hex, bin, oct };
