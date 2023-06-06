@@ -144,7 +144,7 @@ test "raw string followed by string" {
     try testError(
         \\a: \\Hello
         \\"World"
-    , "expected identifier, found 'string'");
+    , "expected 'identifier', found 'string'");
 }
 
 test "empty interpolation" {
