@@ -206,7 +206,7 @@ const Parser = struct {
                 return error.ParsingFailed;
             },
             error.EndOfStream => {
-                try self.emitError("unexpected end of stream, wanted '{s}'", .{name});
+                try self.emitError("expected '{s}', found end of stream", .{name});
                 return error.ParsingFailed;
             },
             error.UnexpectedCharacter => {
@@ -391,7 +391,7 @@ const Parser = struct {
             }
         }
 
-        try self.emitError("unexpected end of file, expected expression", .{});
+        try self.emitError("expected expression, found end of stream", .{});
         return error.ParsingFailed;
     }
 
