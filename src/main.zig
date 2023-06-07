@@ -82,6 +82,7 @@ const Parser = struct {
         oct_number,
         string,
         identifier,
+        symbol,
         fn_name,
         whitespace,
         comment,
@@ -126,6 +127,7 @@ const Parser = struct {
         Pattern.create(.@",", matchers.literal(",")),
         Pattern.create(.@"-", matchers.literal("-")),
         Pattern.create(.identifier, identifierMatcher),
+        Pattern.create(.symbol, symbolMatcher),
     });
 
     const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -153,6 +155,7 @@ const Parser = struct {
     const is_bin_number = ruleset.is(.bin_number);
     const is_oct_number = ruleset.is(.oct_number);
     const is_identifier = ruleset.is(.identifier);
+    const is_symbol = ruleset.is(.symbol);
     const is_string = ruleset.is(.string);
     const is_true = ruleset.is(.true);
     const is_false = ruleset.is(.false);
@@ -183,6 +186,7 @@ const Parser = struct {
         return switch (rule) {
             is_number => "number",
             is_identifier => "identifier",
+            is_symbol => "symbol",
             is_string => "string",
             is_lpar => "(",
             is_rpar => ")",
@@ -352,8 +356,18 @@ const Parser = struct {
                 return self.acceptAtomNumber(.bin, is_bin_number);
             } else if (is_oct_number(token.type)) {
                 return self.acceptAtomNumber(.oct, is_oct_number);
-            } else if (is_identifier(token.type)) {
-                const tok = try self.core.accept(is_identifier);
+            } else if (is_identifier(token.type) or is_symbol(token.type)) {
+                const ident = is_identifier(token.type);
+
+                // Accept an identifier or a symbol
+                const tok = blk: {
+                    if (ident) {
+                        break :blk try self.core.accept(is_identifier);
+                    } else {
+                        break :blk try self.core.accept(is_symbol);
+                    }
+                };
+
                 if (self.inon.functions.get(tok.text)) |_| {
                     if (self.fn_nested) {
                         try self.emitError("nested function calls has to be enclosed in parens", .{});
@@ -363,12 +377,33 @@ const Parser = struct {
                     defer self.fn_nested = false;
                     return self.acceptFunctionCall(tok);
                 }
-                return self.acceptAtomIdentifier(tok);
+
+                if (ident) {
+                    return self.acceptAtomIdentifier(tok);
+                } else {
+                    try self.emitError("undeclared symbol referenced", .{});
+                    return error.ParsingFailed;
+                }
             } else if (is_string(token.type)) {
                 return self.acceptAtomString();
             } else if (is_lpar(token.type)) {
                 _ = (try self.core.accept(is_lpar));
-                const tok = try self.core.accept(is_identifier);
+
+                // Accept an identifier or a symbol
+                const tok = if (try self.peek()) |tok| blk: {
+                    if (is_identifier(tok.type)) {
+                        break :blk try self.core.accept(is_identifier);
+                    } else if (is_symbol(tok.type)) {
+                        break :blk try self.core.accept(is_symbol);
+                    }
+
+                    try self.emitError("expected 'symbol' or 'identifier' as function name, found '{s}'", .{@tagName(tok.type)});
+                    return error.ParsingFailed;
+                } else {
+                    // NOTE: The below line should not be needed, a compiler bug?
+                    return error.ParsingFailed;
+                };
+
                 const atom = self.acceptFunctionCall(tok);
                 _ = (try self.core.accept(is_rpar));
                 return atom;
@@ -757,10 +792,20 @@ fn stringMatcher(str: []const u8) ?usize {
 }
 
 fn identifierMatcher(str: []const u8) ?usize {
-    const first_char = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ++ "!#$%&*+-./;<=>@\\^_`|~";
+    const first_char = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
     const all_chars = first_char ++ "0123456789";
     for (str, 0..) |c, i| {
         if (std.mem.indexOfScalar(u8, if (i > 0) all_chars else first_char, c) == null) {
+            return i;
+        }
+    }
+    return str.len;
+}
+
+fn symbolMatcher(str: []const u8) ?usize {
+    const chars = "!#$%&*+-./;<=>@\\^_`|~";
+    for (str, 0..) |c, i| {
+        if (std.mem.indexOfScalar(u8, chars, c) == null) {
             return i;
         }
     }
