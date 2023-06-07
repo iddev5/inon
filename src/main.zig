@@ -405,7 +405,7 @@ const Parser = struct {
                 };
 
                 const atom = self.acceptFunctionCall(tok);
-                _ = (try self.core.accept(is_rpar));
+                _ = try self.accept(is_rpar);
                 return atom;
             } else if (is_lsqr(token.type)) {
                 return self.acceptAtomList();
