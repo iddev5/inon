@@ -737,14 +737,14 @@ const octaMatcher = octaBinMatcher('o', 8);
 
 fn stringMatcher(str: []const u8) ?usize {
     const raw_string = mem.startsWith(u8, str, "\\");
-    if (!(mem.startsWith(u8, str, "\"") or raw_string))
+    if (!(mem.startsWith(u8, str, "\"") or mem.startsWith(u8, str, "\'") or raw_string))
         return null;
 
     var i: usize = 1;
     while (i < str.len) : (i += 1) {
         switch (str[i]) {
             '\\' => i += 1,
-            '\"' => if (!raw_string) {
+            '\"', '\'' => if (!raw_string) {
                 i += 1;
                 break;
             },
@@ -757,7 +757,7 @@ fn stringMatcher(str: []const u8) ?usize {
 }
 
 fn identifierMatcher(str: []const u8) ?usize {
-    const first_char = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ++ "!#$%&'*+-./;<=>@\\^_`|~";
+    const first_char = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" ++ "!#$%&*+-./;<=>@\\^_`|~";
     const all_chars = first_char ++ "0123456789";
     for (str, 0..) |c, i| {
         if (std.mem.indexOfScalar(u8, if (i > 0) all_chars else first_char, c) == null) {

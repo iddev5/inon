@@ -119,11 +119,13 @@ test "assign string" {
         \\ \\slightly
         \\ \\longer
         \\ \\string
+        \\c: 'single quotes'
     );
     defer data.deinit();
 
     try expectEqualStrings("hello world", data.find("a").get(.str).items);
     try expectEqualStrings("slightly\nlonger\nstring", data.find("b").get(.str).items);
+    try expectEqualStrings("single quotes", data.find("c").get(.str).items);
 }
 
 test "string interpolation" {
