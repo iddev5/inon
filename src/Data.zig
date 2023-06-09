@@ -9,6 +9,7 @@ value: union(Type) {
     num: f64,
     str: String,
     array: Array,
+    object: Object,
     map: Map,
     nulled: void,
 } = undefined,
@@ -16,13 +17,29 @@ allocator: Allocator = undefined,
 
 pub const String = std.ArrayListUnmanaged(u8);
 pub const Array = std.ArrayListUnmanaged(Data);
-pub const Map = std.StringHashMapUnmanaged(Data);
+pub const Object = std.StringHashMapUnmanaged(Data);
+pub const Map = std.HashMapUnmanaged(Data, Data, MapContext(Data), 80);
+
+fn MapContext(comptime K: type) type {
+    return struct {
+        const Ctx = @This();
+        pub fn hash(ctx: Ctx, k: K) u64 {
+            _ = ctx;
+            return k.hash();
+        }
+        pub fn eql(ctx: Ctx, a: K, b: K) bool {
+            _ = ctx;
+            return a.eql(&b);
+        }
+    };
+}
 
 pub const Type = enum(u8) {
     bool,
     num,
     str,
     array,
+    object,
     map,
     nulled,
 };
@@ -39,8 +56,8 @@ pub fn deinit(self: *Data) void {
             }
             self.value.array.deinit(self.allocator);
         },
-        .map => {
-            var iter = self.value.map.iterator();
+        .object => {
+            var iter = self.value.object.iterator();
             while (iter.next()) |entry| {
                 var key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
@@ -49,8 +66,9 @@ pub fn deinit(self: *Data) void {
                 self.allocator.free(key);
                 value.deinit();
             }
-            self.value.map.deinit(self.allocator);
+            self.value.object.deinit(self.allocator);
         },
+        // TODO: map
         else => {},
     }
 }
@@ -64,6 +82,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .num => f64,
     .str => String,
     .array => Array,
+    .object => Object,
     .map => Map,
     .nulled => @compileError("cannot use Data.get(.nulled)"),
 } {
@@ -72,7 +91,8 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
 
 pub fn findEx(self: *const Data, name: []const u8) Data {
     return switch (self.value) {
-        .map => if (self.value.map.get(name)) |data| data else Data.null_data,
+        // TODO: map
+        .object => if (self.value.object.get(name)) |data| data else Data.null_data,
         else => unreachable,
     };
 }
@@ -98,6 +118,22 @@ pub fn index(self: *const Data, in: usize) !Data {
     };
 }
 
+const autoHash = std.hash.autoHash;
+pub fn hash(self: *const Data) u64 {
+    var hasher = std.hash.Wyhash.init(0);
+    switch (self.value) {
+        .bool => |b| autoHash(&hasher, b),
+        .num => |n| autoHash(&hasher, @floatToInt(u64, n)),
+        .str => |str| hasher.update(str.items),
+        .nulled => {},
+        // TODO: extend below
+        .array => |a| autoHash(&hasher, a.items.len),
+        .object => |o| autoHash(&hasher, o.size),
+        .map => |m| autoHash(&hasher, m.size),
+    }
+    return hasher.final();
+}
+
 pub fn eql(self: *const Data, data: *const Data) bool {
     if (meta.activeTag(self.value) != meta.activeTag(data.value))
         return false;
@@ -119,11 +155,11 @@ pub fn eql(self: *const Data, data: *const Data) bool {
 
             break :blk true;
         },
-        .map => blk: {
-            if (self.value.map.size != data.value.map.size)
+        .object => blk: {
+            if (self.value.object.size != data.value.object.size)
                 break :blk false;
 
-            var iter = self.value.map.iterator();
+            var iter = self.value.object.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
@@ -131,6 +167,22 @@ pub fn eql(self: *const Data, data: *const Data) bool {
                 if (!value.eql(&data.findEx(key)))
                     break :blk false;
             }
+
+            break :blk true;
+        },
+        // TODO: proper map support
+        .map => |m| blk: {
+            if (m.size != data.value.object.size)
+                break :blk false;
+
+            // var iter = m.iterator();
+            // while (iter.next()) |entry| {
+            //     const key = entry.key_ptr.*;
+            //     const value = entry.value_ptr.*;
+
+            //     if (!value.eql(&data.findEx(key)))
+            //         break :blk false;
+            // }
 
             break :blk true;
         },
@@ -157,15 +209,30 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
 
             return data;
         },
-        .map => {
+        .object => {
+            var data = Data{ .value = .{ .object = .{} }, .allocator = allocator };
+            var iter = self.value.object.iterator();
+            while (iter.next()) |entry| {
+                const key = entry.key_ptr.*;
+                const value = entry.value_ptr.*;
+                try data.value.object.put(
+                    allocator,
+                    try allocator.dupe(u8, key),
+                    try value.copy(allocator),
+                );
+            }
+
+            return data;
+        },
+        .map => |m| {
             var data = Data{ .value = .{ .map = .{} }, .allocator = allocator };
-            var iter = self.value.map.iterator();
+            var iter = m.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
                 try data.value.map.put(
                     allocator,
-                    try allocator.dupe(u8, key),
+                    try key.copy(allocator),
                     try value.copy(allocator),
                 );
             }
@@ -224,9 +291,9 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             }
             try writer.writeByte(']');
         },
-        .map => {
-            const map = self.value.map;
-            var iter = map.iterator();
+        .object => {
+            const object = self.value.object;
+            var iter = object.iterator();
             var id: usize = 0;
 
             try writer.writeByte('{');
@@ -247,7 +314,39 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
 
                 // Write newline if allowed, otherwise write a comma
-                if (!options.write_newlines and id != map.size - 1) {
+                if (!options.write_newlines and id != object.size - 1) {
+                    try writer.writeAll(", ");
+                }
+            }
+
+            if (id > 0) {
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
+                try writer.writeByteNTimes(' ', start);
+            }
+            try writer.writeByte('}');
+        },
+        .map => {
+            const object = self.value.map;
+            var iter = object.iterator();
+            var id: usize = 0;
+
+            try writer.writeByte('{');
+
+            while (iter.next()) |entry| : (id += 1) {
+                if (options.write_newlines)
+                    try writer.writeByte('\n');
+
+                // Write key
+                try writer.writeByteNTimes(' ', start + indent);
+                try entry.key_ptr.*.serializeInternal(start + indent, indent, writer, options);
+                try writer.writeAll(": ");
+
+                // Write value
+                try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
+
+                // Write newline if allowed, otherwise write a comma
+                if (!options.write_newlines and id != object.size - 1) {
                     try writer.writeAll(", ");
                 }
             }
@@ -285,10 +384,10 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
 
             try jw.endArray();
         },
-        .map => {
+        .object => {
             try jw.beginObject();
 
-            var it = self.value.map.iterator();
+            var it = self.value.object.iterator();
             while (it.next()) |entry| {
                 const key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
@@ -299,5 +398,6 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
 
             try jw.endObject();
         },
+        .map => unreachable, // TODO
     }
 }

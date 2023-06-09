@@ -204,7 +204,7 @@ test "nested array" {
     try expectEqual(@as(f64, 40), array[2].get(.num));
 }
 
-test "assign map" {
+test "assign object" {
     var data = try testNormal(
         \\a: {
         \\  test: "test"
@@ -214,12 +214,12 @@ test "assign map" {
     );
     defer data.deinit();
 
-    const map_a = data.find("a").get(.map);
-    const map_b = data.find("b").get(.map);
+    const object_a = data.find("a").get(.object);
+    const object_b = data.find("b").get(.object);
 
-    try expectEqualStrings("test", map_a.get("test").?.get(.str).items);
-    try expectEqual(@as(f64, 10), map_a.get("hello").?.get(.num));
+    try expectEqualStrings("test", object_a.get("test").?.get(.str).items);
+    try expectEqual(@as(f64, 10), object_a.get("hello").?.get(.num));
 
-    try expectEqual(@as(f64, 10), map_b.get("a").?.get(.num));
-    try expectEqual(@as(f64, 20), map_b.get("b").?.get(.num));
+    try expectEqual(@as(f64, 10), object_b.get("a").?.get(.num));
+    try expectEqual(@as(f64, 20), object_b.get("b").?.get(.num));
 }

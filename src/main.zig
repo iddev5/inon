@@ -37,7 +37,7 @@ pub fn init(allocator: Allocator) Inon {
         .allocator = allocator,
         .diagnostics = ptk.Diagnostics.init(allocator),
         .functions = .{},
-        .context = .{ .value = .{ .map = .{} }, .allocator = allocator },
+        .context = .{ .value = .{ .object = .{} }, .allocator = allocator },
         .current_context = undefined,
     };
 }
@@ -96,6 +96,7 @@ const Parser = struct {
         @")",
         @"[",
         @"]",
+        @"%{",
         @"{",
         @"}",
         @",",
@@ -122,6 +123,7 @@ const Parser = struct {
         Pattern.create(.@"]", matchers.literal("]")),
         Pattern.create(.@"(", matchers.literal("(")),
         Pattern.create(.@")", matchers.literal(")")),
+        Pattern.create(.@"%{", matchers.literal("%{")),
         Pattern.create(.@"{", matchers.literal("{")),
         Pattern.create(.@"}", matchers.literal("}")),
         Pattern.create(.@",", matchers.literal(",")),
@@ -165,6 +167,7 @@ const Parser = struct {
     const is_colon = ruleset.is(.@":");
     const is_lpar = ruleset.is(.@"(");
     const is_rpar = ruleset.is(.@")");
+    const is_ebrac = ruleset.is(.@"%{");
     const is_lbrac = ruleset.is(.@"{");
     const is_rbrac = ruleset.is(.@"}");
     const is_comma = ruleset.is(.@",");
@@ -245,13 +248,22 @@ const Parser = struct {
         return try acceptAtom(self);
     }
 
-    fn acceptTopLevelExpr(self: *Self, context: *Data) ParseError!void {
+    const Extension = enum { extended, non_extended };
+
+    fn acceptTopLevelExpr(self: *Self, context: *Data, extension: Extension) ParseError!void {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const identifier = (try self.accept(is_identifier)).text;
+        var identifier: ?[]const u8 = null;
+        var key: ?Data = null;
 
-        var prev_data = context.findEx(identifier);
+        // TODO: allow maps to also have identifier keys
+        switch (extension) {
+            .non_extended => identifier = (try self.accept(is_identifier)).text,
+            .extended => key = try self.acceptAtom(),
+        }
+
+        var prev_data = if (identifier) |id| context.findEx(id) else Data.null_data;
         const prev_exists = !prev_data.is(.nulled);
 
         const val = blk: {
@@ -299,11 +311,18 @@ const Parser = struct {
             }
         };
 
-        try context.value.map.put(
-            self.inon.allocator,
-            try context.allocator.dupe(u8, identifier),
-            val,
-        );
+        switch (extension) {
+            .non_extended => try context.value.object.put(
+                self.inon.allocator,
+                try context.allocator.dupe(u8, identifier.?),
+                val,
+            ),
+            .extended => try context.value.map.put(
+                self.inon.allocator,
+                key.?,
+                val,
+            ),
+        }
     }
 
     fn acceptObjectNoCtx(self: *Self, context: *Data) ParseError!Data {
@@ -311,20 +330,30 @@ const Parser = struct {
         errdefer self.core.restoreState(state);
 
         while ((try self.peek()) != null) {
-            try self.acceptTopLevelExpr(context);
+            try self.acceptTopLevelExpr(context, .non_extended);
             try self.optional(is_comma);
         }
 
         return context.*;
     }
 
-    fn acceptObject(self: *Self) ParseError!Data {
+    fn acceptObject(self: *Self, extension: Extension) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        _ = try self.core.accept(is_lbrac);
-        var data = Data{ .value = .{ .map = .{} }, .allocator = self.inon.allocator };
+        var data = Data.null_data;
         errdefer data.deinit();
+
+        switch (extension) {
+            .non_extended => {
+                data = Data{ .value = .{ .object = .{} }, .allocator = self.inon.allocator };
+                _ = try self.core.accept(is_lbrac);
+            },
+            .extended => {
+                data = Data{ .value = .{ .map = .{} }, .allocator = self.inon.allocator };
+                _ = try self.core.accept(is_ebrac);
+            },
+        }
 
         const old_context = self.inon.current_context;
         self.inon.current_context = &data;
@@ -334,7 +363,7 @@ const Parser = struct {
             if (is_rbrac(token.type))
                 break;
 
-            try self.acceptTopLevelExpr(&data);
+            try self.acceptTopLevelExpr(&data, extension);
             try self.optional(is_comma);
         }
 
@@ -409,8 +438,10 @@ const Parser = struct {
                 return atom;
             } else if (is_lsqr(token.type)) {
                 return self.acceptAtomList();
+            } else if (is_ebrac(token.type)) {
+                return self.acceptObject(.extended);
             } else if (is_lbrac(token.type)) {
-                return self.acceptObject();
+                return self.acceptObject(.non_extended);
             } else if (is_true(token.type)) {
                 _ = (try self.core.accept(is_true));
                 return Data{ .value = .{ .bool = true } };
