@@ -260,7 +260,17 @@ const Parser = struct {
         // TODO: allow maps to also have identifier keys
         switch (extension) {
             .non_extended => identifier = (try self.accept(is_identifier)).text,
-            .extended => key = try self.acceptAtom(),
+            .extended => {
+                if (try self.peek()) |token| {
+                    if (is_identifier(token.type)) {
+                        const allocator = self.inon.allocator;
+                        key = Data{ .value = .{ .str = .{} }, .allocator = allocator };
+                        try key.?.value.str.appendSlice(allocator, (try self.core.accept(is_identifier)).text);
+                    } else {
+                        key = try self.acceptAtom();
+                    }
+                }
+            },
         }
 
         var prev_data = if (identifier) |id| context.findEx(id) else Data.null_data;
