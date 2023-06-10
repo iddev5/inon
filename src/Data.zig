@@ -68,7 +68,16 @@ pub fn deinit(self: *Data) void {
             }
             self.value.object.deinit(self.allocator);
         },
-        // TODO: map
+        .map => |*m| {
+            var iter = m.iterator();
+            while (iter.next()) |entry| {
+                var key = entry.key_ptr.*;
+                var value = entry.value_ptr.*;
+                key.deinit();
+                value.deinit();
+            }
+            m.deinit(self.allocator);
+        },
         else => {},
     }
 }
