@@ -101,14 +101,10 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     return @field(self.value, @tagName(t));
 }
 
-pub fn findEx(self: *const Data, name: []const u8) Data {
+pub fn findEx(self: *const Data, name: Data) Data {
     return switch (self.value) {
-        .object => if (self.value.object.get(name)) |data| data else Data.null_data,
         .map => {
-            var name_data = Data{ .value = .{ .str = .{} }, .allocator = self.allocator };
-            defer name_data.deinit();
-            name_data.value.str.appendSlice(self.allocator, name) catch unreachable;
-            return if (self.value.map.internal.get(name_data)) |data|
+            return if (self.value.map.internal.get(name)) |data|
                 data
             else
                 Data.null_data;
@@ -117,9 +113,26 @@ pub fn findEx(self: *const Data, name: []const u8) Data {
     };
 }
 
-pub fn find(self: *const Data, name: []const u8) Data {
-    if (std.mem.startsWith(u8, name, "_")) return Data.null_data;
+pub fn findExFromString(self: *const Data, name: []const u8) Data {
+    return self.findEx(Data.fromByteSlice(name));
+}
+
+pub fn find(self: *const Data, name: Data) Data {
+    if (name.is(.str))
+        if (std.mem.startsWith(u8, name.get(.str).items, "_"))
+            return Data.null_data;
     return self.findEx(name);
+}
+
+pub fn findFromString(self: *const Data, name: []const u8) Data {
+    return self.find(Data.fromByteSlice(name));
+}
+
+fn fromByteSlice(slice: []const u8) Data {
+    var data = Data{ .value = .{ .str = .{} }, .allocator = undefined };
+    data.value.str = String.fromOwnedSlice(@constCast(slice));
+
+    return data;
 }
 
 pub fn index(self: *const Data, in: usize) !Data {

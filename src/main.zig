@@ -272,8 +272,7 @@ const Parser = struct {
             },
         }
 
-        const identifier = if (key.is(.str)) key.get(.str).items else null;
-        var prev_data = if (identifier) |id| context.findEx(id) else Data.null_data;
+        var prev_data = context.findEx(key);
         const prev_exists = !prev_data.is(.nulled);
 
         const val = blk: {
@@ -485,7 +484,7 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const data = self.inon.context.findEx(token.text);
+        const data = self.inon.context.findExFromString(token.text);
         if (data.is(.nulled)) {
             try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
             return error.ParsingFailed;
@@ -553,7 +552,7 @@ const Parser = struct {
                             return error.ParsingFailed;
                         }
 
-                        const data = self.inon.context.findEx(sub_name);
+                        const data = self.inon.context.findExFromString(sub_name);
 
                         const writer = str.value.str.writer(str.allocator);
                         try data.serialize(0, writer, .{

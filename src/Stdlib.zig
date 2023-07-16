@@ -20,12 +20,12 @@ const Lib = struct {
     fn find(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
         const data2 = params[1];
-        return try data1.findEx(data2.get(.str).items).copy(inon.allocator);
+        return try data1.findEx(data2).copy(inon.allocator);
     }
 
     fn self(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
-        return try inon.current_context.findEx(data1.get(.str).items).copy(inon.allocator);
+        return try inon.current_context.findExFromString(data1.get(.str).items).copy(inon.allocator);
     }
 
     fn index(inon: *Inon, params: []Data) !Data {
@@ -49,7 +49,7 @@ pub fn addAll(inon: *Inon) !void {
     const functions: []const Inon.FuncType = &.{
         .{ .name = "+", .params = &.{ .num, .num }, .run = Lib.add },
         .{ .name = "*", .params = &.{ .num, .num }, .run = Lib.mul },
-        .{ .name = "find", .params = &.{ null, .str }, .run = Lib.find },
+        .{ .name = "find", .params = &.{ null, null }, .run = Lib.find },
         .{ .name = "self", .params = &.{.str}, .run = Lib.self },
         .{ .name = "index", .params = &.{ null, .num }, .run = Lib.index },
         .{ .name = "=", .params = &.{ null, null }, .run = Lib.eql },

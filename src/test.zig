@@ -36,7 +36,7 @@ test "null value" {
     );
     defer data.deinit();
 
-    try expect(data.find("a").is(.nulled));
+    try expect(data.findFromString("a").is(.nulled));
 }
 
 test "trailing comma" {
@@ -46,8 +46,8 @@ test "trailing comma" {
     );
     defer data.deinit();
 
-    try expect(data.find("a").is(.nulled));
-    try expect(data.find("b").is(.nulled));
+    try expect(data.findFromString("a").is(.nulled));
+    try expect(data.findFromString("b").is(.nulled));
 }
 
 test "assign bool" {
@@ -57,8 +57,8 @@ test "assign bool" {
     );
     defer data.deinit();
 
-    try expectEqual(true, data.find("a").get(.bool));
-    try expectEqual(false, data.find("b").get(.bool));
+    try expectEqual(true, data.findFromString("a").get(.bool));
+    try expectEqual(false, data.findFromString("b").get(.bool));
 }
 
 test "assign number" {
@@ -72,12 +72,12 @@ test "assign number" {
     );
     defer data.deinit();
 
-    try expectEqual(@as(f64, 10.000), data.find("a").get(.num));
-    try expectEqual(@as(f64, -24.00), data.find("b").get(.num));
-    try expectEqual(@as(f64, 41.550), data.find("c").get(.num));
-    try expectEqual(@as(f64, 58.200), data.find("d").get(.num));
-    try expectEqual(@as(f64, 1100.0), data.find("e").get(.num));
-    try expectEqual(@as(f64, 78.1e7), data.find("f").get(.num));
+    try expectEqual(@as(f64, 10.000), data.findFromString("a").get(.num));
+    try expectEqual(@as(f64, -24.00), data.findFromString("b").get(.num));
+    try expectEqual(@as(f64, 41.550), data.findFromString("c").get(.num));
+    try expectEqual(@as(f64, 58.200), data.findFromString("d").get(.num));
+    try expectEqual(@as(f64, 1100.0), data.findFromString("e").get(.num));
+    try expectEqual(@as(f64, 78.1e7), data.findFromString("f").get(.num));
 }
 
 test "hex number" {
@@ -90,11 +90,11 @@ test "hex number" {
     );
     defer data.deinit();
 
-    try expectEqual(@as(f64, 0x10), data.find("a").get(.num));
-    try expectEqual(@as(f64, -0x21), data.find("b").get(.num));
-    try expectEqual(@as(f64, 0x32p2), data.find("c").get(.num));
-    try expectEqual(@as(f64, 0x21.12), data.find("d").get(.num));
-    try expectEqual(@as(f64, 0x47.98p32), data.find("e").get(.num));
+    try expectEqual(@as(f64, 0x10), data.findFromString("a").get(.num));
+    try expectEqual(@as(f64, -0x21), data.findFromString("b").get(.num));
+    try expectEqual(@as(f64, 0x32p2), data.findFromString("c").get(.num));
+    try expectEqual(@as(f64, 0x21.12), data.findFromString("d").get(.num));
+    try expectEqual(@as(f64, 0x47.98p32), data.findFromString("e").get(.num));
 }
 
 test "oct bin number" {
@@ -106,10 +106,10 @@ test "oct bin number" {
     );
     defer data.deinit();
 
-    try expectEqual(@as(f64, -0o71), data.find("a").get(.num));
-    try expectEqual(@as(f64, 0o23), data.find("b").get(.num));
-    try expectEqual(@as(f64, 0b1101), data.find("c").get(.num));
-    try expectEqual(@as(f64, -0b0101), data.find("d").get(.num));
+    try expectEqual(@as(f64, -0o71), data.findFromString("a").get(.num));
+    try expectEqual(@as(f64, 0o23), data.findFromString("b").get(.num));
+    try expectEqual(@as(f64, 0b1101), data.findFromString("c").get(.num));
+    try expectEqual(@as(f64, -0b0101), data.findFromString("d").get(.num));
 }
 
 test "assign string" {
@@ -123,9 +123,9 @@ test "assign string" {
     );
     defer data.deinit();
 
-    try expectEqualStrings("hello world", data.find("a").get(.str).items);
-    try expectEqualStrings("slightly\nlonger\nstring", data.find("b").get(.str).items);
-    try expectEqualStrings("single quotes", data.find("c").get(.str).items);
+    try expectEqualStrings("hello world", data.findFromString("a").get(.str).items);
+    try expectEqualStrings("slightly\nlonger\nstring", data.findFromString("b").get(.str).items);
+    try expectEqualStrings("single quotes", data.findFromString("c").get(.str).items);
 }
 
 test "string interpolation" {
@@ -138,8 +138,8 @@ test "string interpolation" {
     );
     defer data.deinit();
 
-    try expectEqualStrings("a is 10 value", data.find("b").get(.str).items);
-    try expectEqualStrings("hello world", data.find("d").get(.str).items);
+    try expectEqualStrings("a is 10 value", data.findFromString("b").get(.str).items);
+    try expectEqualStrings("hello world", data.findFromString("d").get(.str).items);
 }
 
 test "raw string followed by string" {
@@ -161,7 +161,7 @@ test "interpolation escape" {
     );
     defer data.deinit();
 
-    try expectEqualStrings("{something}", data.find("a").get(.str).items);
+    try expectEqualStrings("{something}", data.findFromString("a").get(.str).items);
 }
 
 test "unmatched interpolation" {
@@ -180,7 +180,7 @@ test "assign array" {
     );
     defer data.deinit();
 
-    const array = data.find("a").get(.array).items;
+    const array = data.findFromString("a").get(.array).items;
 
     try expectEqual(@as(f64, 10), array[0].get(.num));
     try expectEqual(true, array[1].get(.bool));
@@ -193,7 +193,7 @@ test "nested array" {
     );
     defer data.deinit();
 
-    const array = data.find("a").get(.array).items;
+    const array = data.findFromString("a").get(.array).items;
 
     try expectEqual(@as(f64, 10), array[0].get(.num));
     {
@@ -214,11 +214,11 @@ test "assign map" {
     );
     defer data.deinit();
 
-    const map_a = data.find("a");
-    const map_b = data.find("b");
+    const map_a = data.findFromString("a");
+    const map_b = data.findFromString("b");
 
-    try expectEqualStrings("test", map_a.find("test").get(.str).items);
-    try expectEqual(@as(f64, 10), map_a.find("hello").get(.num));
+    try expectEqualStrings("test", map_a.findFromString("test").get(.str).items);
+    try expectEqual(@as(f64, 10), map_a.findFromString("hello").get(.num));
 
     try expectEqual(@as(f64, 10), map_b.find("a").get(.num));
     try expectEqual(@as(f64, 20), map_b.find("b").get(.num));
