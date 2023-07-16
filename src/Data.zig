@@ -18,7 +18,10 @@ allocator: Allocator = undefined,
 pub const String = std.ArrayListUnmanaged(u8);
 pub const Array = std.ArrayListUnmanaged(Data);
 pub const Object = std.StringHashMapUnmanaged(Data);
-pub const Map = std.HashMapUnmanaged(Data, Data, MapContext(Data), 80);
+pub const Map = struct {
+    internal: std.HashMapUnmanaged(Data, Data, MapContext(Data), 80) = .{},
+    is_object: bool = false,
+};
 
 fn MapContext(comptime K: type) type {
     return struct {
@@ -69,14 +72,14 @@ pub fn deinit(self: *Data) void {
             self.value.object.deinit(self.allocator);
         },
         .map => |*m| {
-            var iter = m.iterator();
+            var iter = m.internal.iterator();
             while (iter.next()) |entry| {
                 var key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
                 key.deinit();
                 value.deinit();
             }
-            m.deinit(self.allocator);
+            m.internal.deinit(self.allocator);
         },
         else => {},
     }
@@ -100,8 +103,16 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
 
 pub fn findEx(self: *const Data, name: []const u8) Data {
     return switch (self.value) {
-        // TODO: map
         .object => if (self.value.object.get(name)) |data| data else Data.null_data,
+        .map => {
+            var name_data = Data{ .value = .{ .str = .{} }, .allocator = self.allocator };
+            defer name_data.deinit();
+            name_data.value.str.appendSlice(self.allocator, name) catch unreachable;
+            return if (self.value.map.internal.get(name_data)) |data|
+                data
+            else
+                Data.null_data;
+        },
         else => unreachable,
     };
 }
@@ -132,13 +143,13 @@ pub fn hash(self: *const Data) u64 {
     var hasher = std.hash.Wyhash.init(0);
     switch (self.value) {
         .bool => |b| autoHash(&hasher, b),
-        .num => |n| autoHash(&hasher, @floatToInt(u64, n)),
+        .num => |n| autoHash(&hasher, @as(u64, @intFromFloat(n))),
         .str => |str| hasher.update(str.items),
         .nulled => {},
         // TODO: extend below
         .array => |a| autoHash(&hasher, a.items.len),
         .object => |o| autoHash(&hasher, o.size),
-        .map => |m| autoHash(&hasher, m.size),
+        .map => |m| autoHash(&hasher, m.internal.size),
     }
     return hasher.final();
 }
@@ -181,7 +192,7 @@ pub fn eql(self: *const Data, data: *const Data) bool {
         },
         // TODO: proper map support
         .map => |m| blk: {
-            if (m.size != data.value.object.size)
+            if (m.internal.size != data.value.map.internal.size)
                 break :blk false;
 
             // var iter = m.iterator();
@@ -235,11 +246,11 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
         },
         .map => |m| {
             var data = Data{ .value = .{ .map = .{} }, .allocator = allocator };
-            var iter = m.iterator();
+            var iter = m.internal.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
-                try data.value.map.put(
+                try data.value.map.internal.put(
                     allocator,
                     try key.copy(allocator),
                     try value.copy(allocator),
@@ -337,7 +348,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
         },
         .map => {
             const object = self.value.map;
-            var iter = object.iterator();
+            var iter = object.internal.iterator();
             var id: usize = 0;
 
             try writer.writeByte('{');
@@ -355,7 +366,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
 
                 // Write newline if allowed, otherwise write a comma
-                if (!options.write_newlines and id != object.size - 1) {
+                if (!options.write_newlines and id != object.internal.size - 1) {
                     try writer.writeAll(", ");
                 }
             }
@@ -373,7 +384,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
 pub fn serializeToJson(self: *Data, indent: usize, writer: anytype) @TypeOf(writer).Error!void {
     // Depth 10 should be enough?
     var jw = std.json.writeStream(writer, 10);
-    jw.whitespace.indent.space = @intCast(u8, indent);
+    jw.whitespace.indent.space = @as(u8, @intCast(indent));
     try serializeJsonInternal(self, &jw);
 }
 

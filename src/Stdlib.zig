@@ -33,7 +33,7 @@ const Lib = struct {
         const data1 = params[0];
         const data2 = params[1];
 
-        const n = @floatToInt(usize, data2.get(.num));
+        const n = @as(usize, @intFromFloat(data2.get(.num)));
 
         return try data1.index(n);
     }

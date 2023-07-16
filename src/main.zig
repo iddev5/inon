@@ -37,7 +37,7 @@ pub fn init(allocator: Allocator) Inon {
         .allocator = allocator,
         .diagnostics = ptk.Diagnostics.init(allocator),
         .functions = .{},
-        .context = .{ .value = .{ .object = .{} }, .allocator = allocator },
+        .context = .{ .value = .{ .map = .{} }, .allocator = allocator },
         .current_context = undefined,
     };
 }
@@ -254,18 +254,17 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        var identifier: ?[]const u8 = null;
-        var key: ?Data = null;
+        const allocator = self.inon.allocator;
+        var key: Data = Data{ .value = .{ .str = .{} }, .allocator = allocator };
+        errdefer key.deinit();
 
         // TODO: allow maps to also have identifier keys
         switch (extension) {
-            .non_extended => identifier = (try self.accept(is_identifier)).text,
+            .non_extended => try key.value.str.appendSlice(allocator, (try self.accept(is_identifier)).text),
             .extended => {
                 if (try self.peek()) |token| {
                     if (is_identifier(token.type)) {
-                        const allocator = self.inon.allocator;
-                        key = Data{ .value = .{ .str = .{} }, .allocator = allocator };
-                        try key.?.value.str.appendSlice(allocator, (try self.core.accept(is_identifier)).text);
+                        try key.value.str.appendSlice(allocator, (try self.core.accept(is_identifier)).text);
                     } else {
                         key = try self.acceptAtom();
                     }
@@ -273,6 +272,7 @@ const Parser = struct {
             },
         }
 
+        const identifier = if (key.is(.str)) key.get(.str).items else null;
         var prev_data = if (identifier) |id| context.findEx(id) else Data.null_data;
         const prev_exists = !prev_data.is(.nulled);
 
@@ -291,6 +291,7 @@ const Parser = struct {
                                 prev_data.deinit();
                             break :blk try expr.copy(self.inon.allocator);
                         } else {
+                            key.deinit();
                             return;
                         }
                     }
@@ -302,6 +303,7 @@ const Parser = struct {
                     var value = try self.acceptAtom();
 
                     if (prev_exists) {
+                        key.deinit();
                         value.deinit();
                         return;
                     }
@@ -321,18 +323,11 @@ const Parser = struct {
             }
         };
 
-        switch (extension) {
-            .non_extended => try context.value.object.put(
-                self.inon.allocator,
-                try context.allocator.dupe(u8, identifier.?),
-                val,
-            ),
-            .extended => try context.value.map.put(
-                self.inon.allocator,
-                key.?,
-                val,
-            ),
-        }
+        try context.value.map.internal.put(
+            self.inon.allocator,
+            key,
+            val,
+        );
     }
 
     fn acceptObjectNoCtx(self: *Self, context: *Data) ParseError!Data {
@@ -356,7 +351,7 @@ const Parser = struct {
 
         switch (extension) {
             .non_extended => {
-                data = Data{ .value = .{ .object = .{} }, .allocator = self.inon.allocator };
+                data = Data{ .value = .{ .map = .{ .is_object = true } }, .allocator = self.inon.allocator };
                 _ = try self.core.accept(is_lbrac);
             },
             .extended => {
@@ -481,7 +476,7 @@ const Parser = struct {
         return Data{ .value = .{
             .num = switch (num_type) {
                 .dec, .hex => std.fmt.parseFloat(f64, value.text) catch unreachable,
-                .bin, .oct => @intToFloat(f64, std.fmt.parseInt(i64, value.text, 0) catch unreachable),
+                .bin, .oct => @as(f64, @floatFromInt(std.fmt.parseInt(i64, value.text, 0) catch unreachable)),
             },
         } };
     }
