@@ -279,6 +279,8 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             var iter = object.iterator();
             var id: usize = 0;
 
+            if (!self.is_object)
+                try writer.writeByte('%');
             try writer.writeByte('{');
 
             while (iter.next()) |entry| : (id += 1) {
@@ -286,8 +288,15 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                     try writer.writeByte('\n');
 
                 // Write key
+                const key = entry.key_ptr.*;
                 try writer.writeByteNTimes(' ', start + indent);
-                try entry.key_ptr.*.serializeInternal(start + indent, indent, writer, options);
+                if (self.is_object) {
+                    if (key.is(.str)) {
+                        try writer.writeAll(key.get(.str).items);
+                    } else unreachable;
+                } else {
+                    try key.serializeInternal(start + indent, indent, writer, options);
+                }
                 try writer.writeAll(": ");
 
                 // Write value

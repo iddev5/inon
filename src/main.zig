@@ -37,7 +37,11 @@ pub fn init(allocator: Allocator) Inon {
         .allocator = allocator,
         .diagnostics = ptk.Diagnostics.init(allocator),
         .functions = .{},
-        .context = .{ .value = .{ .map = .{} }, .allocator = allocator },
+        .context = .{
+            .value = .{ .map = .{} },
+            .allocator = allocator,
+            .is_object = true,
+        },
         .current_context = undefined,
     };
 }
@@ -350,8 +354,11 @@ const Parser = struct {
 
         switch (extension) {
             .non_extended => {
-                data = Data{ .value = .{ .map = .{} }, .allocator = self.inon.allocator };
-                data.is_object = true;
+                data = Data{
+                    .value = .{ .map = .{} },
+                    .allocator = self.inon.allocator,
+                    .is_object = true,
+                };
                 _ = try self.core.accept(is_lbrac);
             },
             .extended => {
