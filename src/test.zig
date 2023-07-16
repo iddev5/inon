@@ -220,6 +220,25 @@ test "assign map" {
     try expectEqualStrings("test", map_a.findFromString("test").get(.str).items);
     try expectEqual(@as(f64, 10), map_a.findFromString("hello").get(.num));
 
-    try expectEqual(@as(f64, 10), map_b.find("a").get(.num));
-    try expectEqual(@as(f64, 20), map_b.find("b").get(.num));
+    try expectEqual(@as(f64, 10), map_b.findFromString("a").get(.num));
+    try expectEqual(@as(f64, 20), map_b.findFromString("b").get(.num));
+}
+
+test "map extended equal" {
+    var data = try testNormal(
+        \\a: %{
+        \\  10: "test"
+        \\  true: 10
+        \\}
+        \\b: %{
+        \\  10: "test"
+        \\  true: 10
+        \\}
+    );
+    defer data.deinit();
+
+    const map_a = data.findFromString("a");
+    const map_b = data.findFromString("b");
+
+    try expect(map_a.eql(&map_b));
 }

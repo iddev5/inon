@@ -195,10 +195,11 @@ pub fn eql(self: *const Data, data: *const Data) bool {
             var iter = self.value.object.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
+                _ = key;
                 const value = entry.value_ptr.*;
+                _ = value;
 
-                if (!value.eql(&data.findEx(key)))
-                    break :blk false;
+                break :blk false;
             }
 
             break :blk true;
@@ -208,14 +209,14 @@ pub fn eql(self: *const Data, data: *const Data) bool {
             if (m.internal.size != data.value.map.internal.size)
                 break :blk false;
 
-            // var iter = m.iterator();
-            // while (iter.next()) |entry| {
-            //     const key = entry.key_ptr.*;
-            //     const value = entry.value_ptr.*;
+            var iter = m.internal.iterator();
+            while (iter.next()) |entry| {
+                const key = entry.key_ptr.*;
+                const value = entry.value_ptr.*;
 
-            //     if (!value.eql(&data.findEx(key)))
-            //         break :blk false;
-            // }
+                if (!value.eql(&data.findEx(key)))
+                    break :blk false;
+            }
 
             break :blk true;
         },
