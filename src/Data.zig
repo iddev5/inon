@@ -9,19 +9,15 @@ value: union(Type) {
     num: f64,
     str: String,
     array: Array,
-    object: Object,
     map: Map,
     nulled: void,
 } = undefined,
 allocator: Allocator = undefined,
+is_object: bool = false,
 
 pub const String = std.ArrayListUnmanaged(u8);
 pub const Array = std.ArrayListUnmanaged(Data);
-pub const Object = std.StringHashMapUnmanaged(Data);
-pub const Map = struct {
-    internal: std.HashMapUnmanaged(Data, Data, MapContext(Data), 80) = .{},
-    is_object: bool = false,
-};
+pub const Map = std.HashMapUnmanaged(Data, Data, MapContext(Data), 80);
 
 fn MapContext(comptime K: type) type {
     return struct {
@@ -42,7 +38,6 @@ pub const Type = enum(u8) {
     num,
     str,
     array,
-    object,
     map,
     nulled,
 };
@@ -59,27 +54,15 @@ pub fn deinit(self: *Data) void {
             }
             self.value.array.deinit(self.allocator);
         },
-        .object => {
-            var iter = self.value.object.iterator();
-            while (iter.next()) |entry| {
-                var key = entry.key_ptr.*;
-                var value = entry.value_ptr.*;
-                // TODO: this would panic in case the user is manually adding the field
-                // without allocating it.
-                self.allocator.free(key);
-                value.deinit();
-            }
-            self.value.object.deinit(self.allocator);
-        },
         .map => |*m| {
-            var iter = m.internal.iterator();
+            var iter = m.iterator();
             while (iter.next()) |entry| {
                 var key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
                 key.deinit();
                 value.deinit();
             }
-            m.internal.deinit(self.allocator);
+            m.deinit(self.allocator);
         },
         else => {},
     }
@@ -94,7 +77,6 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .num => f64,
     .str => String,
     .array => Array,
-    .object => Object,
     .map => Map,
     .nulled => @compileError("cannot use Data.get(.nulled)"),
 } {
@@ -104,7 +86,7 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
 pub fn findEx(self: *const Data, name: Data) Data {
     return switch (self.value) {
         .map => {
-            return if (self.value.map.internal.get(name)) |data|
+            return if (self.value.map.get(name)) |data|
                 data
             else
                 Data.null_data;
@@ -161,8 +143,7 @@ pub fn hash(self: *const Data) u64 {
         .nulled => {},
         // TODO: extend below
         .array => |a| autoHash(&hasher, a.items.len),
-        .object => |o| autoHash(&hasher, o.size),
-        .map => |m| autoHash(&hasher, m.internal.size),
+        .map => |m| autoHash(&hasher, m.size),
     }
     return hasher.final();
 }
@@ -188,28 +169,11 @@ pub fn eql(self: *const Data, data: *const Data) bool {
 
             break :blk true;
         },
-        .object => blk: {
-            if (self.value.object.size != data.value.object.size)
-                break :blk false;
-
-            var iter = self.value.object.iterator();
-            while (iter.next()) |entry| {
-                const key = entry.key_ptr.*;
-                _ = key;
-                const value = entry.value_ptr.*;
-                _ = value;
-
-                break :blk false;
-            }
-
-            break :blk true;
-        },
-        // TODO: proper map support
         .map => |m| blk: {
-            if (m.internal.size != data.value.map.internal.size)
+            if (m.size != data.value.map.size)
                 break :blk false;
 
-            var iter = m.internal.iterator();
+            var iter = m.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
@@ -243,28 +207,13 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
 
             return data;
         },
-        .object => {
-            var data = Data{ .value = .{ .object = .{} }, .allocator = allocator };
-            var iter = self.value.object.iterator();
-            while (iter.next()) |entry| {
-                const key = entry.key_ptr.*;
-                const value = entry.value_ptr.*;
-                try data.value.object.put(
-                    allocator,
-                    try allocator.dupe(u8, key),
-                    try value.copy(allocator),
-                );
-            }
-
-            return data;
-        },
         .map => |m| {
             var data = Data{ .value = .{ .map = .{} }, .allocator = allocator };
-            var iter = m.internal.iterator();
+            var iter = m.iterator();
             while (iter.next()) |entry| {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
-                try data.value.map.internal.put(
+                try data.value.map.put(
                     allocator,
                     try key.copy(allocator),
                     try value.copy(allocator),
@@ -325,44 +274,9 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             }
             try writer.writeByte(']');
         },
-        .object => {
-            const object = self.value.object;
-            var iter = object.iterator();
-            var id: usize = 0;
-
-            try writer.writeByte('{');
-
-            while (iter.next()) |entry| : (id += 1) {
-                if (options.write_newlines)
-                    try writer.writeByte('\n');
-
-                const key = entry.key_ptr.*;
-                if (std.mem.startsWith(u8, key, "_"))
-                    continue;
-
-                // Write key
-                try writer.writeByteNTimes(' ', start + indent);
-                try writer.print("{s}: ", .{key});
-
-                // Write value
-                try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
-
-                // Write newline if allowed, otherwise write a comma
-                if (!options.write_newlines and id != object.size - 1) {
-                    try writer.writeAll(", ");
-                }
-            }
-
-            if (id > 0) {
-                if (options.write_newlines)
-                    try writer.writeByte('\n');
-                try writer.writeByteNTimes(' ', start);
-            }
-            try writer.writeByte('}');
-        },
         .map => {
             const object = self.value.map;
-            var iter = object.internal.iterator();
+            var iter = object.iterator();
             var id: usize = 0;
 
             try writer.writeByte('{');
@@ -380,7 +294,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try entry.value_ptr.*.serializeInternal(start + indent, indent, writer, options);
 
                 // Write newline if allowed, otherwise write a comma
-                if (!options.write_newlines and id != object.internal.size - 1) {
+                if (!options.write_newlines and id != object.size - 1) {
                     try writer.writeAll(", ");
                 }
             }
@@ -418,24 +332,10 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
 
             try jw.endArray();
         },
-        .object => {
-            try jw.beginObject();
-
-            var it = self.value.object.iterator();
-            while (it.next()) |entry| {
-                const key = entry.key_ptr.*;
-                var value = entry.value_ptr.*;
-
-                try jw.objectField(key);
-                try value.serializeJsonInternal(jw);
-            }
-
-            try jw.endObject();
-        },
         .map => {
             try jw.beginObject();
 
-            var it = self.value.map.internal.iterator();
+            var it = self.value.map.iterator();
             while (it.next()) |entry| {
                 var key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;

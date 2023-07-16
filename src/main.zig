@@ -322,7 +322,7 @@ const Parser = struct {
             }
         };
 
-        try context.value.map.internal.put(
+        try context.value.map.put(
             self.inon.allocator,
             key,
             val,
@@ -350,7 +350,8 @@ const Parser = struct {
 
         switch (extension) {
             .non_extended => {
-                data = Data{ .value = .{ .map = .{ .is_object = true } }, .allocator = self.inon.allocator };
+                data = Data{ .value = .{ .map = .{} }, .allocator = self.inon.allocator };
+                data.is_object = true;
                 _ = try self.core.accept(is_lbrac);
             },
             .extended => {
