@@ -418,6 +418,22 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
 
             try jw.endObject();
         },
-        .map => unreachable, // TODO
+        .map => {
+            try jw.beginObject();
+
+            var it = self.value.map.internal.iterator();
+            while (it.next()) |entry| {
+                var key = entry.key_ptr.*;
+                var value = entry.value_ptr.*;
+
+                // TODO: support other key types
+                if (key.is(.str)) {
+                    try jw.objectField(key.get(.str).items);
+                }
+                try value.serializeJsonInternal(jw);
+            }
+
+            try jw.endObject();
+        },
     }
 }

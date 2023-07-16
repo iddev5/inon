@@ -40,7 +40,7 @@ pub fn main() anyerror!void {
     try stdout.writeAll("\n\n");
 
     try stdout.print("Json: \n\n", .{});
-    // try inon.serializeToJson(&data, stdout);
+    try inon.serializeToJson(&data, stdout);
     try stdout.writeAll("\n\n");
 
     std.log.info("All your config files are belong to us.", .{});
