@@ -343,6 +343,10 @@ const Parser = struct {
 
         _ = try self.accept(is_rbrac);
 
+        const ret_val = data.findFromString("return");
+        if (!ret_val.is(.nulled))
+            return ret_val;
+
         return data;
     }
 
