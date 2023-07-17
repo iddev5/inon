@@ -93,8 +93,6 @@ const Parser = struct {
         true,
         false,
         null,
-        @"::",
-        @"?:",
         @":",
         @"(",
         @")",
@@ -120,8 +118,6 @@ const Parser = struct {
         Pattern.create(.null, matchers.literal("null")),
         Pattern.create(.whitespace, matchers.takeAnyOf(" \n\r\t")),
         Pattern.create(.comment, commentMatcher),
-        Pattern.create(.@"::", matchers.literal("::")),
-        Pattern.create(.@"?:", matchers.literal("?:")),
         Pattern.create(.@":", matchers.literal(":")),
         Pattern.create(.@"[", matchers.literal("[")),
         Pattern.create(.@"]", matchers.literal("]")),
@@ -166,8 +162,6 @@ const Parser = struct {
     const is_true = ruleset.is(.true);
     const is_false = ruleset.is(.false);
     const is_null = ruleset.is(.null);
-    const is_dualcolon = ruleset.is(.@"::");
-    const is_optcolon = ruleset.is(.@"?:");
     const is_colon = ruleset.is(.@":");
     const is_lpar = ruleset.is(.@"(");
     const is_rpar = ruleset.is(.@")");
@@ -262,7 +256,6 @@ const Parser = struct {
         var key: Data = Data{ .value = .{ .str = .{} }, .allocator = allocator };
         errdefer key.deinit();
 
-        // TODO: allow maps to also have identifier keys
         switch (extension) {
             .non_extended => try key.value.str.appendSlice(allocator, (try self.accept(is_identifier)).text),
             .extended => {
@@ -281,43 +274,12 @@ const Parser = struct {
 
         const val = blk: {
             if (try self.peek()) |token| {
-                if (is_dualcolon(token.type)) {
-                    _ = try self.core.accept(is_dualcolon);
-                    var cond = try acceptAtom(self);
-                    defer cond.deinit();
-
-                    if (cond.is(.bool)) {
-                        var expr = try acceptAssignment(self);
-                        defer expr.deinit();
-                        if (cond.get(.bool)) {
-                            if (prev_exists)
-                                prev_data.deinit();
-                            break :blk try expr.copy(self.inon.allocator);
-                        } else {
-                            key.deinit();
-                            return;
-                        }
-                    }
-
-                    try self.emitError("expected condition of type 'bool'", .{});
-                    return error.ParsingFailed;
-                } else if (is_optcolon(token.type)) {
-                    _ = try self.core.accept(is_optcolon);
-                    var value = try self.acceptAtom();
-
-                    if (prev_exists) {
-                        key.deinit();
-                        value.deinit();
-                        return;
-                    }
-
-                    break :blk value;
-                } else if (is_colon(token.type)) {
+                if (is_colon(token.type)) {
                     if (prev_exists)
                         prev_data.deinit();
                     break :blk try acceptAssignment(self);
                 } else {
-                    try self.emitError("expected '::', '?:' or ':' after identifier", .{});
+                    try self.emitError("expected ':' after identifier", .{});
                     return error.ParsingFailed;
                 }
             } else {
