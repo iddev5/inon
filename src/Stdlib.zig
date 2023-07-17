@@ -43,6 +43,18 @@ const Lib = struct {
         const data2 = params[1];
         return Data{ .value = .{ .bool = data1.eql(&data2) } };
     }
+
+    fn switch_(inon: *Inon, params: []Data) !Data {
+        const map = params[0];
+        var iter = map.get(.map).iterator();
+        while (iter.next()) |pair| {
+            const key = pair.key_ptr.*;
+            if (key.is(.bool) and key.get(.bool) == true) {
+                return pair.value_ptr.*.copy(inon.allocator);
+            }
+        }
+        return map.findFromString("else");
+    }
 };
 
 pub fn addAll(inon: *Inon) !void {
@@ -53,6 +65,7 @@ pub fn addAll(inon: *Inon) !void {
         .{ .name = "self", .params = &.{.str}, .run = Lib.self },
         .{ .name = "index", .params = &.{ null, .num }, .run = Lib.index },
         .{ .name = "=", .params = &.{ null, null }, .run = Lib.eql },
+        .{ .name = "switch", .params = &.{.map}, .run = Lib.switch_ },
     };
 
     for (functions) |f| {
