@@ -564,21 +564,45 @@ const Parser = struct {
         return data;
     }
 
+    fn identifierToType(self: *Self, ident: []const u8) ?Data.Type {
+        _ = self;
+        return std.meta.stringToEnum(Data.Type, ident);
+    }
+
     fn acceptFunctionDef(self: *Self) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
         _ = try self.core.accept(is_def);
+        _ = try self.accept(is_lpar);
 
-        // TEMP: nums
-        const param_count = try self.acceptAtomNumber(.dec, is_number);
+        var params: std.ArrayListUnmanaged(?Data.Type) = .{};
+        while (try self.peek()) |tok| {
+            if (is_rpar(tok.type))
+                break;
+
+            const ident = try self.accept(is_identifier);
+            try params.append(self.inon.allocator, self.identifierToType(ident.text));
+
+            if (try self.peek()) |tk| {
+                if (is_rpar(tk.type))
+                    break;
+
+                _ = try self.accept(is_comma);
+            }
+        }
+
+        _ = try self.accept(is_rpar);
+
         const code = try self.acceptAtomString();
-        return Data{ .value = .{
-            .func = .{
-                .param_count = @intFromFloat(param_count.value.num),
-                .code = code.value.str.items,
+        return Data{
+            .value = .{
+                .func = .{
+                    .params = try params.toOwnedSlice(self.inon.allocator),
+                    .code = code.value.str.items,
+                },
             },
-        } };
+        };
     }
 
     fn acceptFunctionCall(self: *Self, token: Tokenizer.Token) ParseError!Data {
@@ -602,28 +626,49 @@ const Parser = struct {
             return error.ParsingFailed;
         }
 
-        if (func.is(.func)) {
-            var i: usize = 0;
-            while (i < func.value.func.param_count) : (i += 1) {
-                if (try self.peek()) |_| {
-                    const arg = try self.acceptAtom();
-                    try args.value.array.append(args.allocator, arg);
-                } else break;
-            }
+        const params = if (func.is(.func)) func.get(.func).params else func.get(.native).params;
 
-            return try self.callFunction(&func.value.func, args.value.array.items, fn_name);
-        }
-
+        // Collect arguments
         var i: usize = 0;
-        while (i < func.value.native.params.len) : (i += 1) {
+        while (i < params.len) : (i += 1) {
             if (try self.peek()) |_| {
                 const arg = try self.acceptAtom();
                 try args.value.array.append(args.allocator, arg);
             } else break;
         }
 
+        // Validate argument count
+        const no_of_args = args.get(.array).items.len;
+        if (no_of_args != params.len) {
+            try self.emitError("function '{s}' takes {} args, found {}", .{ fn_name, params.len, no_of_args });
+            return error.ParsingFailed;
+        }
+
+        // Validate argument type
+        for (params, 0..) |param, idx| {
+            if (param) |par| {
+                const arg = args.get(.array).items[idx];
+                if (!arg.is(par)) {
+                    try self.emitError(
+                        "function '{s}' expects argument {} be of type '{s}' while '{s}' is given",
+                        .{
+                            fn_name,
+                            idx,
+                            @tagName(par),
+                            @tagName(arg.value),
+                        },
+                    );
+                    return error.ParsingFailed;
+                }
+            }
+        }
+
+        if (func.is(.func)) {
+            return try self.callFunction(&func.value.func, args.value.array.items, fn_name);
+        }
+
         defer args.deinit();
-        return try self.callNative(&func.value.native, args.get(.array).items, fn_name);
+        return try self.callNative(&func.value.native, args.get(.array).items);
     }
 
     pub fn callFunction(self: *Self, func: *Data.Function, args: []Data, fn_name: []const u8) !Data {
@@ -671,33 +716,7 @@ const Parser = struct {
         return ret;
     }
 
-    pub fn callNative(self: *Self, func: *Data.NativeFunction, args: []Data, fn_name: []const u8) !Data {
-        // Validate argument count
-        const no_of_args = args.len;
-        if (no_of_args != func.params.len) {
-            try self.emitError("function '{s}' takes {} args, found {}", .{ fn_name, func.params.len, no_of_args });
-            return error.ParsingFailed;
-        }
-
-        // Validate argument type
-        for (func.params, 0..) |param, idx| {
-            if (param) |par| {
-                const arg = args[idx];
-                if (!arg.is(par)) {
-                    try self.emitError(
-                        "function '{s}' expects argument {} be of type '{s}' while '{s}' is given",
-                        .{
-                            fn_name,
-                            idx,
-                            @tagName(par),
-                            @tagName(arg.value),
-                        },
-                    );
-                    return error.ParsingFailed;
-                }
-            }
-        }
-
+    pub fn callNative(self: *Self, func: *Data.NativeFunction, args: []Data) !Data {
         // Run the function and return the result
         return try func.run(self.inon, args);
     }

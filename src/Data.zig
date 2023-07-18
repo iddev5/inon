@@ -23,7 +23,7 @@ pub const Array = std.ArrayListUnmanaged(Data);
 pub const Map = std.HashMapUnmanaged(Data, Data, MapContext(Data), 80);
 
 pub const Function = struct {
-    param_count: u32,
+    params: []const ?Data.Type,
     code: []const u8,
 };
 
@@ -163,7 +163,7 @@ pub fn hash(self: *const Data) u64 {
         // TODO: extend below
         .array => |a| autoHash(&hasher, a.items.len),
         .map => |m| autoHash(&hasher, m.size),
-        .func => |f| autoHash(&hasher, f.param_count),
+        .func => |f| autoHash(&hasher, f.params.len),
         .native => |n| autoHash(&hasher, n.params.len),
     }
     return hasher.final();
@@ -247,7 +247,7 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
         // TODO
         .func, .native => {
             return Data{ .value = .{ .func = .{
-                .param_count = 0,
+                .params = &.{},
                 .code = undefined,
             } } };
         },
