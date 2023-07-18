@@ -85,6 +85,8 @@ pub fn deinit(self: *Data) void {
             }
             m.deinit(self.allocator);
         },
+        .func => |*f| self.allocator.free(f.params),
+        .native => |*n| self.allocator.free(n.params),
         else => {},
     }
 }

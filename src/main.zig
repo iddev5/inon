@@ -625,6 +625,7 @@ const Parser = struct {
         };
 
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
+        defer args.deinit();
         var func = self.inon.context.findFromString(fn_name);
 
         if (func.is(.nulled)) {
@@ -673,7 +674,6 @@ const Parser = struct {
             return try self.callFunction(&func.value.func, args.value.array.items, fn_name);
         }
 
-        defer args.deinit();
         return try self.callNative(&func.value.native, args.get(.array).items);
     }
 

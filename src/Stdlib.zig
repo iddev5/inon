@@ -129,6 +129,7 @@ pub fn addAll(inon: *Inon) !void {
             .allocator = inon.allocator,
         }, Data{
             .value = .{ .native = f.func },
+            .allocator = inon.allocator,
         });
     }
 }
