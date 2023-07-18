@@ -576,13 +576,19 @@ const Parser = struct {
         _ = try self.core.accept(is_def);
         _ = try self.accept(is_lpar);
 
-        var params: std.ArrayListUnmanaged(?Data.Type) = .{};
+        var params: std.ArrayListUnmanaged(Data.Param) = .{};
         while (try self.peek()) |tok| {
             if (is_rpar(tok.type))
                 break;
 
             const ident = try self.accept(is_identifier);
-            try params.append(self.inon.allocator, self.identifierToType(ident.text));
+            _ = try self.accept(is_colon);
+            const ty = try self.accept(is_identifier);
+
+            try params.append(self.inon.allocator, .{
+                .name = try self.inon.allocator.dupe(u8, ident.text),
+                .type = self.identifierToType(ty.text),
+            });
 
             if (try self.peek()) |tk| {
                 if (is_rpar(tk.type))
@@ -646,15 +652,15 @@ const Parser = struct {
 
         // Validate argument type
         for (params, 0..) |param, idx| {
-            if (param) |par| {
-                const arg = args.get(.array).items[idx];
-                if (!arg.is(par)) {
+            const arg = args.get(.array).items[idx];
+            if (param.type) |ty| {
+                if (!arg.is(ty)) {
                     try self.emitError(
                         "function '{s}' expects argument {} be of type '{s}' while '{s}' is given",
                         .{
                             fn_name,
                             idx,
-                            @tagName(par),
+                            @tagName(ty),
                             @tagName(arg.value),
                         },
                     );
@@ -673,21 +679,20 @@ const Parser = struct {
 
     pub fn callFunction(self: *Self, func: *Data.Function, args: []Data, fn_name: []const u8) !Data {
         var ctx = try self.inon.context.copy(self.inon.allocator);
-        const name = try self.inon.allocator.dupe(u8, "args");
 
-        const args_data = Data{
-            .value = .{ .array = Data.Array.fromOwnedSlice(args) },
-            .allocator = self.inon.allocator,
-        };
-
-        try ctx.value.map.put(
-            self.inon.allocator,
-            Data{
-                .value = .{ .str = Data.String.fromOwnedSlice(name) },
-                .allocator = self.inon.allocator,
-            },
-            try args_data.copy(self.inon.allocator),
-        );
+        for (args, 0..) |arg, idx| {
+            const param = func.params[idx];
+            try ctx.value.map.put(
+                self.inon.allocator,
+                Data{
+                    .value = .{ .str = Data.String.fromOwnedSlice(
+                        try self.inon.allocator.dupe(u8, param.name),
+                    ) },
+                    .allocator = self.inon.allocator,
+                },
+                try arg.copy(self.inon.allocator),
+            );
+        }
 
         var inon = Inon.init(self.inon.allocator);
         defer inon.deinit();

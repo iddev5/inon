@@ -23,13 +23,18 @@ pub const Array = std.ArrayListUnmanaged(Data);
 pub const Map = std.HashMapUnmanaged(Data, Data, MapContext(Data), 80);
 
 pub const Function = struct {
-    params: []const ?Data.Type,
+    params: []Param,
     code: []const u8,
 };
 
 pub const NativeFunction = struct {
-    params: []const ?Data.Type,
+    params: []Param,
     run: *const fn (inon: *Inon, params: []Data) std.mem.Allocator.Error!Data,
+};
+
+pub const Param = struct {
+    name: []const u8 = undefined,
+    type: ?Data.Type = null,
 };
 
 fn MapContext(comptime K: type) type {

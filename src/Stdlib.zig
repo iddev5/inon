@@ -57,17 +57,68 @@ const Lib = struct {
     }
 };
 
+fn paramBuilder(allocator: std.mem.Allocator, types: []?Data.Type) ![]Data.Param {
+    var params: std.ArrayListUnmanaged(Data.Param) = .{};
+    for (types) |ty| {
+        try params.append(allocator, Data.Param{ .type = ty });
+    }
+    return params.toOwnedSlice(allocator);
+}
+
 pub fn addAll(inon: *Inon) !void {
     const Func = struct { name: []const u8, func: Data.NativeFunction };
 
+    const allocator = inon.allocator;
     const functions: []const Func = &.{
-        .{ .name = "+", .func = .{ .params = &.{ .num, .num }, .run = Lib.add } },
-        .{ .name = "*", .func = .{ .params = &.{ .num, .num }, .run = Lib.mul } },
-        .{ .name = "find", .func = .{ .params = &.{ null, null }, .run = Lib.find } },
-        .{ .name = "self", .func = .{ .params = &.{.str}, .run = Lib.self } },
-        .{ .name = "index", .func = .{ .params = &.{ null, .num }, .run = Lib.index } },
-        .{ .name = "=", .func = .{ .params = &.{ null, null }, .run = Lib.eql } },
-        .{ .name = "switch", .func = .{ .params = &.{.map}, .run = Lib.switch_ } },
+        .{
+            .name = "+",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ .num, .num })),
+                .run = Lib.add,
+            },
+        },
+        .{
+            .name = "*",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ .num, .num })),
+                .run = Lib.mul,
+            },
+        },
+        .{
+            .name = "=",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ null, null })),
+                .run = Lib.eql,
+            },
+        },
+        .{
+            .name = "find",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ null, null })),
+                .run = Lib.find,
+            },
+        },
+        .{
+            .name = "self",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{.str})),
+                .run = Lib.self,
+            },
+        },
+        .{
+            .name = "index",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ null, .num })),
+                .run = Lib.index,
+            },
+        },
+        .{
+            .name = "switch",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{.map})),
+                .run = Lib.switch_,
+            },
+        },
     };
 
     for (functions) |f| {
