@@ -58,17 +58,26 @@ const Lib = struct {
 };
 
 pub fn addAll(inon: *Inon) !void {
-    const functions: []const Inon.FuncType = &.{
-        .{ .name = "+", .params = &.{ .num, .num }, .run = Lib.add },
-        .{ .name = "*", .params = &.{ .num, .num }, .run = Lib.mul },
-        .{ .name = "find", .params = &.{ null, null }, .run = Lib.find },
-        .{ .name = "self", .params = &.{.str}, .run = Lib.self },
-        .{ .name = "index", .params = &.{ null, .num }, .run = Lib.index },
-        .{ .name = "=", .params = &.{ null, null }, .run = Lib.eql },
-        .{ .name = "switch", .params = &.{.map}, .run = Lib.switch_ },
+    const Func = struct { name: []const u8, func: Data.NativeFunction };
+
+    const functions: []const Func = &.{
+        .{ .name = "+", .func = .{ .params = &.{ .num, .num }, .run = Lib.add } },
+        .{ .name = "*", .func = .{ .params = &.{ .num, .num }, .run = Lib.mul } },
+        .{ .name = "find", .func = .{ .params = &.{ null, null }, .run = Lib.find } },
+        .{ .name = "self", .func = .{ .params = &.{.str}, .run = Lib.self } },
+        .{ .name = "index", .func = .{ .params = &.{ null, .num }, .run = Lib.index } },
+        .{ .name = "=", .func = .{ .params = &.{ null, null }, .run = Lib.eql } },
+        .{ .name = "switch", .func = .{ .params = &.{.map}, .run = Lib.switch_ } },
     };
 
     for (functions) |f| {
-        try inon.functions.put(inon.allocator, f.name, f);
+        try inon.context.value.map.put(inon.allocator, Data{
+            .value = .{ .str = Data.String.fromOwnedSlice(
+                try inon.allocator.dupe(u8, f.name),
+            ) },
+            .allocator = inon.allocator,
+        }, Data{
+            .value = .{ .native = f.func },
+        });
     }
 }

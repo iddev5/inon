@@ -8,35 +8,14 @@ pub const Stdlib = @import("Stdlib.zig");
 const Inon = @This();
 
 allocator: Allocator,
-functions: FuncList,
 context: Data,
 current_context: *Data,
 diagnostics: ptk.Diagnostics,
-
-const Message = struct {
-    location: ptk.Location,
-    message: []const u8,
-
-    pub fn free(self: @This(), allocator: Allocator) void {
-        allocator.free(self.message);
-    }
-};
-
-const Error = mem.Allocator.Error;
-
-pub const FuncFnType = fn (inon: *Inon, params: []Data) Error!Data;
-pub const FuncType = struct {
-    name: []const u8,
-    params: []const ?Data.Type,
-    run: *const FuncFnType,
-};
-pub const FuncList = std.StringArrayHashMapUnmanaged(FuncType);
 
 pub fn init(allocator: Allocator) Inon {
     return .{
         .allocator = allocator,
         .diagnostics = ptk.Diagnostics.init(allocator),
-        .functions = .{},
         .context = .{
             .value = .{ .map = .{} },
             .allocator = allocator,
@@ -48,7 +27,6 @@ pub fn init(allocator: Allocator) Inon {
 
 pub fn deinit(inon: *Inon) void {
     inon.diagnostics.deinit();
-    inon.functions.deinit(inon.allocator);
     inon.context.deinit();
 }
 
@@ -92,6 +70,7 @@ const Parser = struct {
         comment,
         true,
         false,
+        def,
         null,
         @":",
         @"(",
@@ -115,6 +94,7 @@ const Parser = struct {
         Pattern.create(.string, stringMatcher),
         Pattern.create(.true, matchers.literal("true")),
         Pattern.create(.false, matchers.literal("false")),
+        Pattern.create(.def, matchers.literal("def")),
         Pattern.create(.null, matchers.literal("null")),
         Pattern.create(.whitespace, matchers.takeAnyOf(" \n\r\t")),
         Pattern.create(.comment, commentMatcher),
@@ -161,6 +141,7 @@ const Parser = struct {
     const is_string = ruleset.is(.string);
     const is_true = ruleset.is(.true);
     const is_false = ruleset.is(.false);
+    const is_def = ruleset.is(.def);
     const is_null = ruleset.is(.null);
     const is_colon = ruleset.is(.@":");
     const is_lpar = ruleset.is(.@"(");
@@ -375,7 +356,8 @@ const Parser = struct {
                     }
                 };
 
-                if (self.inon.functions.get(tok.text)) |_| {
+                const prob_func = self.inon.context.findFromString(tok.text);
+                if (prob_func.is(.func) or prob_func.is(.native)) {
                     if (self.fn_nested) {
                         try self.emitError("nested function calls has to be enclosed in parens", .{});
                         return error.ParsingFailed;
@@ -426,6 +408,8 @@ const Parser = struct {
             } else if (is_false(token.type)) {
                 _ = (try self.core.accept(is_false));
                 return Data{ .value = .{ .bool = false } };
+            } else if (is_def(token.type)) {
+                return self.acceptFunctionDef();
             } else if (is_null(token.type)) {
                 _ = (try self.core.accept(is_null));
                 return Data.null_data;
@@ -580,6 +564,23 @@ const Parser = struct {
         return data;
     }
 
+    fn acceptFunctionDef(self: *Self) ParseError!Data {
+        const state = self.core.saveState();
+        errdefer self.core.restoreState(state);
+
+        _ = try self.core.accept(is_def);
+
+        // TEMP: nums
+        const param_count = try self.acceptAtomNumber(.dec, is_number);
+        const code = try self.acceptAtomString();
+        return Data{ .value = .{
+            .func = .{
+                .param_count = @intFromFloat(param_count.value.num),
+                .code = code.value.str.items,
+            },
+        } };
+    }
+
     fn acceptFunctionCall(self: *Self, token: Tokenizer.Token) ParseError!Data {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
@@ -594,39 +595,100 @@ const Parser = struct {
         };
 
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
-        defer args.deinit();
+        var func = self.inon.context.findFromString(fn_name);
 
-        const func = if (self.inon.functions.get(fn_name)) |func| func else {
+        if (func.is(.nulled)) {
             try self.emitError("function '{s}' has not been defined", .{fn_name});
             return error.ParsingFailed;
-        };
-        const param_count = func.params.len;
+        }
+
+        if (func.is(.func)) {
+            var i: usize = 0;
+            while (i < func.value.func.param_count) : (i += 1) {
+                if (try self.peek()) |_| {
+                    const arg = try self.acceptAtom();
+                    try args.value.array.append(args.allocator, arg);
+                } else break;
+            }
+
+            return try self.callFunction(&func.value.func, args.value.array.items, fn_name);
+        }
 
         var i: usize = 0;
-        while (i < param_count) : (i += 1) {
+        while (i < func.value.native.params.len) : (i += 1) {
             if (try self.peek()) |_| {
                 const arg = try self.acceptAtom();
                 try args.value.array.append(args.allocator, arg);
             } else break;
         }
 
+        defer args.deinit();
+        return try self.callNative(&func.value.native, args.get(.array).items, fn_name);
+    }
+
+    pub fn callFunction(self: *Self, func: *Data.Function, args: []Data, fn_name: []const u8) !Data {
+        var ctx = try self.inon.context.copy(self.inon.allocator);
+        const name = try self.inon.allocator.dupe(u8, "args");
+
+        const args_data = Data{
+            .value = .{ .array = Data.Array.fromOwnedSlice(args) },
+            .allocator = self.inon.allocator,
+        };
+
+        try ctx.value.map.put(
+            self.inon.allocator,
+            Data{
+                .value = .{ .str = Data.String.fromOwnedSlice(name) },
+                .allocator = self.inon.allocator,
+            },
+            try args_data.copy(self.inon.allocator),
+        );
+
+        var inon = Inon.init(self.inon.allocator);
+        defer inon.deinit();
+
+        inon.context = ctx;
+
+        try Inon.Stdlib.addAll(&inon);
+
+        const val = inon.parse(fn_name, func.code) catch |err| switch (err) {
+            error.ParsingFailed => {
+                for (inon.diagnostics.errors.items) |ierr| {
+                    const di_alloc = self.inon.diagnostics.memory.allocator();
+
+                    var new_err = ierr;
+                    if (ierr.location.source) |src|
+                        new_err.location.source = try di_alloc.dupe(u8, src);
+                    new_err.message = try di_alloc.dupeZ(u8, ierr.message);
+
+                    try self.inon.diagnostics.errors.append(self.inon.allocator, new_err);
+                }
+                return error.ParsingFailed;
+            },
+            else => |e| return e,
+        };
+        const ret = try val.findFromString("return").copy(self.inon.allocator);
+        return ret;
+    }
+
+    pub fn callNative(self: *Self, func: *Data.NativeFunction, args: []Data, fn_name: []const u8) !Data {
         // Validate argument count
-        const no_of_args = args.get(.array).items.len;
-        if (no_of_args != param_count) {
-            try self.emitError("function '{s}' takes {} args, found {}", .{ fn_name, param_count, no_of_args });
+        const no_of_args = args.len;
+        if (no_of_args != func.params.len) {
+            try self.emitError("function '{s}' takes {} args, found {}", .{ fn_name, func.params.len, no_of_args });
             return error.ParsingFailed;
         }
 
         // Validate argument type
-        for (func.params, 0..) |param, index| {
+        for (func.params, 0..) |param, idx| {
             if (param) |par| {
-                const arg = args.get(.array).items[index];
+                const arg = args[idx];
                 if (!arg.is(par)) {
                     try self.emitError(
                         "function '{s}' expects argument {} be of type '{s}' while '{s}' is given",
                         .{
                             fn_name,
-                            index,
+                            idx,
                             @tagName(par),
                             @tagName(arg.value),
                         },
@@ -637,7 +699,7 @@ const Parser = struct {
         }
 
         // Run the function and return the result
-        return try func.run(self.inon, args.get(.array).items);
+        return try func.run(self.inon, args);
     }
 };
 

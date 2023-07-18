@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const meta = std.meta;
+const Inon = @import("main.zig");
 
 const Data = @This();
 
@@ -10,6 +11,8 @@ value: union(Type) {
     str: String,
     array: Array,
     map: Map,
+    func: Function,
+    native: NativeFunction,
     nulled: void,
 } = undefined,
 allocator: Allocator = undefined,
@@ -18,6 +21,16 @@ is_object: bool = false,
 pub const String = std.ArrayListUnmanaged(u8);
 pub const Array = std.ArrayListUnmanaged(Data);
 pub const Map = std.HashMapUnmanaged(Data, Data, MapContext(Data), 80);
+
+pub const Function = struct {
+    param_count: u32,
+    code: []const u8,
+};
+
+pub const NativeFunction = struct {
+    params: []const ?Data.Type,
+    run: *const fn (inon: *Inon, params: []Data) std.mem.Allocator.Error!Data,
+};
 
 fn MapContext(comptime K: type) type {
     return struct {
@@ -39,6 +52,8 @@ pub const Type = enum(u8) {
     str,
     array,
     map,
+    func,
+    native,
     nulled,
 };
 
@@ -59,6 +74,7 @@ pub fn deinit(self: *Data) void {
             while (iter.next()) |entry| {
                 var key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
+
                 key.deinit();
                 value.deinit();
             }
@@ -78,6 +94,8 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .str => String,
     .array => Array,
     .map => Map,
+    .func => Function,
+    .native => NativeFunction,
     .nulled => @compileError("cannot use Data.get(.nulled)"),
 } {
     return @field(self.value, @tagName(t));
@@ -110,7 +128,8 @@ pub fn findFromString(self: *const Data, name: []const u8) Data {
     return self.find(Data.fromByteSlice(name));
 }
 
-fn fromByteSlice(slice: []const u8) Data {
+// TODO
+pub fn fromByteSlice(slice: []const u8) Data {
     var data = Data{ .value = .{ .str = .{} }, .allocator = undefined };
     data.value.str = String.fromOwnedSlice(@constCast(slice));
 
@@ -144,6 +163,8 @@ pub fn hash(self: *const Data) u64 {
         // TODO: extend below
         .array => |a| autoHash(&hasher, a.items.len),
         .map => |m| autoHash(&hasher, m.size),
+        .func => |f| autoHash(&hasher, f.param_count),
+        .native => |n| autoHash(&hasher, n.params.len),
     }
     return hasher.final();
 }
@@ -185,6 +206,7 @@ pub fn eql(self: *const Data, data: *const Data) bool {
             break :blk true;
         },
         .nulled => true,
+        else => false,
     };
 }
 
@@ -221,6 +243,13 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
             }
 
             return data;
+        },
+        // TODO
+        .func, .native => {
+            return Data{ .value = .{ .func = .{
+                .param_count = 0,
+                .code = undefined,
+            } } };
         },
     }
 }
@@ -284,11 +313,16 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             try writer.writeByte('{');
 
             while (iter.next()) |entry| : (id += 1) {
+                const key = entry.key_ptr.*;
+                const value = entry.value_ptr.*;
+
+                if (value.is(.native))
+                    continue;
+
                 if (options.write_newlines)
                     try writer.writeByte('\n');
 
                 // Write key
-                const key = entry.key_ptr.*;
                 try writer.writeByteNTimes(' ', start + indent);
                 if (self.is_object) {
                     if (key.is(.str)) {
@@ -315,6 +349,8 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
             }
             try writer.writeByte('}');
         },
+        .func => try writer.writeAll("<func>"),
+        .native => {},
     }
 }
 
@@ -349,6 +385,9 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
                 var key = entry.key_ptr.*;
                 var value = entry.value_ptr.*;
 
+                if (value.is(.native))
+                    continue;
+
                 // TODO: support other key types
                 if (key.is(.str)) {
                     try jw.objectField(key.get(.str).items);
@@ -358,5 +397,7 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
 
             try jw.endObject();
         },
+        .func => try jw.emitString("<func>"),
+        .native => {},
     }
 }
