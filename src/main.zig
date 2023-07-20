@@ -606,6 +606,7 @@ const Parser = struct {
                     .code = code.value.str.items,
                 },
             },
+            .allocator = self.inon.allocator,
         };
     }
 

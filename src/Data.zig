@@ -251,8 +251,17 @@ pub fn copy(self: *const Data, allocator: Allocator) Allocator.Error!Data {
 
             return data;
         },
+        .func => |f| {
+            return Data{
+                .value = .{ .func = .{
+                    .params = try self.allocator.dupe(Param, f.params),
+                    .code = f.code,
+                } },
+                .allocator = self.allocator,
+            };
+        },
         // TODO
-        .func, .native => {
+        .native => {
             return Data{ .value = .{ .func = .{
                 .params = &.{},
                 .code = undefined,
