@@ -10,6 +10,13 @@ const Lib = struct {
         return Data{ .value = .{ .num = data1.get(.num) + data2.get(.num) } };
     }
 
+    fn sub(inon: *Inon, params: []Data) !Data {
+        _ = inon;
+        const data1 = params[0];
+        const data2 = params[1];
+        return Data{ .value = .{ .num = data1.get(.num) - data2.get(.num) } };
+    }
+
     fn mul(inon: *Inon, params: []Data) !Data {
         _ = inon;
         const data1 = params[0];
@@ -75,6 +82,13 @@ pub fn addAll(inon: *Inon) !void {
             .func = .{
                 .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ .num, .num })),
                 .run = Lib.add,
+            },
+        },
+        .{
+            .name = "-",
+            .func = .{
+                .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ .num, .num })),
+                .run = Lib.sub,
             },
         },
         .{

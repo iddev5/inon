@@ -81,7 +81,6 @@ const Parser = struct {
         @"{",
         @"}",
         @",",
-        @"-",
     };
 
     const Pattern = ptk.Pattern(TokenType);
@@ -107,7 +106,6 @@ const Parser = struct {
         Pattern.create(.@"{", matchers.literal("{")),
         Pattern.create(.@"}", matchers.literal("}")),
         Pattern.create(.@",", matchers.literal(",")),
-        Pattern.create(.@"-", matchers.literal("-")),
         Pattern.create(.identifier, identifierMatcher),
         Pattern.create(.symbol, symbolMatcher),
     });
