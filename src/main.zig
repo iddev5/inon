@@ -248,7 +248,7 @@ const Parser = struct {
             },
         }
 
-        var prev_data = context.findEx(key);
+        var prev_data = context.getEx(key);
         const prev_exists = !prev_data.is(.nulled);
 
         const val = blk: {
@@ -322,7 +322,7 @@ const Parser = struct {
 
         _ = try self.accept(is_rbrac);
 
-        const ret_val = data.findFromString("return");
+        const ret_val = data.get("return");
         if (!ret_val.is(.nulled))
             return ret_val;
 
@@ -354,7 +354,7 @@ const Parser = struct {
                     }
                 };
 
-                const prob_func = self.inon.context.findFromString(tok.text);
+                const prob_func = self.inon.context.get(tok.text);
                 if (prob_func.is(.func) or prob_func.is(.native)) {
                     if (self.fn_nested) {
                         try self.emitError("nested function calls has to be enclosed in parens", .{});
@@ -440,7 +440,7 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const data = self.inon.context.findExFromString(token.text);
+        const data = self.inon.context.getEx(token.text);
         if (data.is(.nulled)) {
             try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
             return error.ParsingFailed;
@@ -508,7 +508,7 @@ const Parser = struct {
                             return error.ParsingFailed;
                         }
 
-                        const data = self.inon.context.findExFromString(sub_name);
+                        const data = self.inon.context.getEx(sub_name);
 
                         const writer = str.value.str.writer(str.allocator);
                         try data.serialize(0, writer, .{
@@ -625,14 +625,14 @@ const Parser = struct {
 
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
         defer args.deinit();
-        var func = self.inon.context.findFromString(fn_name);
+        var func = self.inon.context.get(fn_name);
 
         if (func.is(.nulled)) {
             try self.emitError("function '{s}' has not been defined", .{fn_name});
             return error.ParsingFailed;
         }
 
-        const params = if (func.is(.func)) func.get(.func).params else func.get(.native).params;
+        const params = if (func.is(.func)) func.raw(.func).?.params else func.raw(.native).?.params;
 
         // Collect arguments
         var i: usize = 0;
@@ -644,7 +644,7 @@ const Parser = struct {
         }
 
         // Validate argument count
-        const no_of_args = args.get(.array).items.len;
+        const no_of_args = args.raw(.array).?.items.len;
         if (no_of_args != params.len) {
             try self.emitError("function '{s}' takes {} args, found {}", .{ fn_name, params.len, no_of_args });
             return error.ParsingFailed;
@@ -652,7 +652,7 @@ const Parser = struct {
 
         // Validate argument type
         for (params, 0..) |param, idx| {
-            const arg = args.get(.array).items[idx];
+            const arg = args.raw(.array).?.items[idx];
             if (param.type) |ty| {
                 if (!arg.is(ty)) {
                     try self.emitError(
@@ -673,7 +673,7 @@ const Parser = struct {
             return try self.callFunction(&func.value.func, args.value.array.items, fn_name);
         }
 
-        return try self.callNative(&func.value.native, args.get(.array).items);
+        return try self.callNative(&func.value.native, args.raw(.array).?.items);
     }
 
     pub fn callFunction(self: *Self, func: *Data.Function, args: []Data, fn_name: []const u8) !Data {
@@ -716,7 +716,7 @@ const Parser = struct {
             },
             else => |e| return e,
         };
-        const ret = try val.findFromString("return").copy(self.inon.allocator);
+        const ret = try val.get("return").copy(self.inon.allocator);
         return ret;
     }
 

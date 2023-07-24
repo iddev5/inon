@@ -7,32 +7,32 @@ const Lib = struct {
         _ = inon;
         const data1 = params[0];
         const data2 = params[1];
-        return Data{ .value = .{ .num = data1.get(.num) + data2.get(.num) } };
+        return Data{ .value = .{ .num = data1.raw(.num).? + data2.raw(.num).? } };
     }
 
     fn sub(inon: *Inon, params: []Data) !Data {
         _ = inon;
         const data1 = params[0];
         const data2 = params[1];
-        return Data{ .value = .{ .num = data1.get(.num) - data2.get(.num) } };
+        return Data{ .value = .{ .num = data1.raw(.num).? - data2.raw(.num).? } };
     }
 
     fn mul(inon: *Inon, params: []Data) !Data {
         _ = inon;
         const data1 = params[0];
         const data2 = params[1];
-        return Data{ .value = .{ .num = data1.get(.num) * data2.get(.num) } };
+        return Data{ .value = .{ .num = data1.raw(.num).? * data2.raw(.num).? } };
     }
 
-    fn find(inon: *Inon, params: []Data) !Data {
+    fn get(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
         const data2 = params[1];
-        return try data1.findEx(data2).copy(inon.allocator);
+        return try data1.getEx(data2).copy(inon.allocator);
     }
 
     fn self(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
-        return try inon.current_context.findExFromString(data1.get(.str).items).copy(inon.allocator);
+        return try inon.current_context.getEx(data1.raw(.str).?.items).copy(inon.allocator);
     }
 
     fn index(inon: *Inon, params: []Data) !Data {
@@ -40,7 +40,7 @@ const Lib = struct {
         const data1 = params[0];
         const data2 = params[1];
 
-        const n = @as(usize, @intFromFloat(data2.get(.num)));
+        const n = @as(usize, @intFromFloat(data2.raw(.num).?));
 
         return try data1.index(n);
     }
@@ -53,14 +53,14 @@ const Lib = struct {
 
     fn switch_(inon: *Inon, params: []Data) !Data {
         const map = params[0];
-        var iter = map.get(.map).iterator();
+        var iter = map.raw(.map).?.iterator();
         while (iter.next()) |pair| {
             const key = pair.key_ptr.*;
-            if (key.is(.bool) and key.get(.bool) == true) {
+            if (key.is(.bool) and key.raw(.bool).? == true) {
                 return pair.value_ptr.*.copy(inon.allocator);
             }
         }
-        return map.findFromString("else");
+        return map.get("else");
     }
 };
 
@@ -106,10 +106,10 @@ pub fn addAll(inon: *Inon) !void {
             },
         },
         .{
-            .name = "find",
+            .name = "get",
             .func = .{
                 .params = try paramBuilder(allocator, @constCast(&[_]?Data.Type{ null, null })),
-                .run = Lib.find,
+                .run = Lib.get,
             },
         },
         .{

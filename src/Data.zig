@@ -95,7 +95,7 @@ pub fn is(self: *const Data, t: Type) bool {
     return self.value == t;
 }
 
-pub fn get(self: *const Data, comptime t: Type) switch (t) {
+pub fn raw(self: *const Data, comptime t: Type) ?switch (t) {
     .bool => bool,
     .num => f64,
     .str => String,
@@ -103,15 +103,25 @@ pub fn get(self: *const Data, comptime t: Type) switch (t) {
     .map => Map,
     .func => Function,
     .native => NativeFunction,
-    .nulled => @compileError("cannot use Data.get(.nulled)"),
+    .nulled => @compileError("cannot use Data.raw(.nulled)"),
 } {
-    return @field(self.value, @tagName(t));
+    if (self.is(t))
+        return @field(self.value, @tagName(t));
+
+    return null;
 }
 
-pub fn findEx(self: *const Data, name: Data) Data {
+pub fn getEx(self: *const Data, name: anytype) Data {
+    var name_obj: Data = undefined;
+    switch (@typeInfo(@TypeOf(name))) {
+        // TODO: check for string type
+        .Pointer => name_obj = Data.fromByteSlice(name),
+        else => name_obj = name,
+    }
+
     return switch (self.value) {
         .map => {
-            return if (self.value.map.get(name)) |data|
+            return if (self.value.map.get(name_obj)) |data|
                 data
             else
                 Data.null_data;
@@ -120,19 +130,15 @@ pub fn findEx(self: *const Data, name: Data) Data {
     };
 }
 
-pub fn findExFromString(self: *const Data, name: []const u8) Data {
-    return self.findEx(Data.fromByteSlice(name));
-}
+pub fn get(self: *const Data, name: anytype) Data {
+    switch (@typeInfo(@TypeOf(name))) {
+        // TODO: check for string type
+        .Pointer => if (std.mem.startsWith(u8, name, "_"))
+            return Data.null_data,
+        else => {},
+    }
 
-pub fn find(self: *const Data, name: Data) Data {
-    if (name.is(.str))
-        if (std.mem.startsWith(u8, name.get(.str).items, "_"))
-            return Data.null_data;
-    return self.findEx(name);
-}
-
-pub fn findFromString(self: *const Data, name: []const u8) Data {
-    return self.find(Data.fromByteSlice(name));
+    return self.getEx(name);
 }
 
 // TODO
@@ -146,14 +152,14 @@ pub fn fromByteSlice(slice: []const u8) Data {
 pub fn index(self: *const Data, in: usize) !Data {
     return switch (self.value) {
         .str => blk: {
-            if (in > self.get(.str).items.len) break :blk Data.null_data;
+            if (in > self.raw(.str).?.items.len) break :blk Data.null_data;
             var data = Data{ .value = .{ .str = .{} }, .allocator = self.allocator };
-            try data.value.str.append(data.allocator, self.get(.str).items[in]);
+            try data.value.str.append(data.allocator, self.raw(.str).?.items[in]);
             break :blk data;
         },
         .array => blk: {
-            if (in > self.get(.array).items.len) break :blk Data.null_data;
-            break :blk try self.get(.array).items[in].copy(self.allocator);
+            if (in > self.raw(.array).?.items.len) break :blk Data.null_data;
+            break :blk try self.raw(.array).?.items[in].copy(self.allocator);
         },
         else => unreachable,
     };
@@ -206,7 +212,7 @@ pub fn eql(self: *const Data, data: *const Data) bool {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
 
-                if (!value.eql(&data.findEx(key)))
+                if (!value.eql(&data.getEx(key)))
                     break :blk false;
             }
 
@@ -342,7 +348,7 @@ fn serializeInternal(self: *const Data, start: usize, indent: usize, writer: any
                 try writer.writeByteNTimes(' ', start + indent);
                 if (self.is_object) {
                     if (key.is(.str)) {
-                        try writer.writeAll(key.get(.str).items);
+                        try writer.writeAll(key.raw(.str).?.items);
                     } else unreachable;
                 } else {
                     try key.serializeInternal(start + indent, indent, writer, options);
@@ -406,7 +412,7 @@ fn serializeJsonInternal(self: *Data, jw: anytype) @TypeOf(jw.stream).Error!void
 
                 // TODO: support other key types
                 if (key.is(.str)) {
-                    try jw.objectField(key.get(.str).items);
+                    try jw.objectField(key.raw(.str).?.items);
                 }
                 try value.serializeJsonInternal(jw);
             }
