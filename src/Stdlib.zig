@@ -27,12 +27,14 @@ const Lib = struct {
     fn get(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
         const data2 = params[1];
-        return try data1.getEx(data2).copy(inon.allocator);
+        return try (data1.getEx(data2) orelse Data.null_data).copy(inon.allocator);
     }
 
     fn self(inon: *Inon, params: []Data) !Data {
         const data1 = params[0];
-        return try inon.current_context.getEx(data1.raw(.str).?.items).copy(inon.allocator);
+        const ret = inon.current_context.getEx(data1.raw(.str).?.items) orelse Data.null_data;
+
+        return try ret.copy(inon.allocator);
     }
 
     fn index(inon: *Inon, params: []Data) !Data {
@@ -60,7 +62,7 @@ const Lib = struct {
                 return pair.value_ptr.*.copy(inon.allocator);
             }
         }
-        return map.get("else");
+        return map.get("else") orelse Data.null_data;
     }
 };
 

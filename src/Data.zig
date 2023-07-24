@@ -111,7 +111,7 @@ pub fn raw(self: *const Data, comptime t: Type) ?switch (t) {
     return null;
 }
 
-pub fn getEx(self: *const Data, name: anytype) Data {
+pub fn getEx(self: *const Data, name: anytype) ?Data {
     var name_obj: Data = undefined;
     switch (@typeInfo(@TypeOf(name))) {
         // TODO: check for string type
@@ -124,17 +124,17 @@ pub fn getEx(self: *const Data, name: anytype) Data {
             return if (self.value.map.get(name_obj)) |data|
                 data
             else
-                Data.null_data;
+                null;
         },
         else => unreachable,
     };
 }
 
-pub fn get(self: *const Data, name: anytype) Data {
+pub fn get(self: *const Data, name: anytype) ?Data {
     switch (@typeInfo(@TypeOf(name))) {
         // TODO: check for string type
         .Pointer => if (std.mem.startsWith(u8, name, "_"))
-            return Data.null_data,
+            return null,
         else => {},
     }
 
@@ -212,8 +212,10 @@ pub fn eql(self: *const Data, data: *const Data) bool {
                 const key = entry.key_ptr.*;
                 const value = entry.value_ptr.*;
 
-                if (!value.eql(&data.getEx(key)))
-                    break :blk false;
+                if (data.getEx(key)) |mem| {
+                    if (!value.eql(&mem))
+                        break :blk false;
+                }
             }
 
             break :blk true;

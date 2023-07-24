@@ -248,14 +248,13 @@ const Parser = struct {
             },
         }
 
-        var prev_data = context.getEx(key);
-        const prev_exists = !prev_data.is(.nulled);
-
         const val = blk: {
             if (try self.peek()) |token| {
                 if (is_colon(token.type)) {
-                    if (prev_exists)
+                    var prev = context.getEx(key);
+                    if (prev) |*prev_data|
                         prev_data.deinit();
+
                     break :blk try acceptAssignment(self);
                 } else {
                     try self.emitError("expected ':' after identifier", .{});
@@ -322,8 +321,7 @@ const Parser = struct {
 
         _ = try self.accept(is_rbrac);
 
-        const ret_val = data.get("return");
-        if (!ret_val.is(.nulled))
+        if (data.get("return")) |ret_val|
             return ret_val;
 
         return data;
@@ -354,15 +352,16 @@ const Parser = struct {
                     }
                 };
 
-                const prob_func = self.inon.context.get(tok.text);
-                if (prob_func.is(.func) or prob_func.is(.native)) {
-                    if (self.fn_nested) {
-                        try self.emitError("nested function calls has to be enclosed in parens", .{});
-                        return error.ParsingFailed;
+                if (self.inon.context.get(tok.text)) |prob_func| {
+                    if (prob_func.is(.func) or prob_func.is(.native)) {
+                        if (self.fn_nested) {
+                            try self.emitError("nested function calls has to be enclosed in parens", .{});
+                            return error.ParsingFailed;
+                        }
+                        self.fn_nested = true;
+                        defer self.fn_nested = false;
+                        return self.acceptFunctionCall(tok);
                     }
-                    self.fn_nested = true;
-                    defer self.fn_nested = false;
-                    return self.acceptFunctionCall(tok);
                 }
 
                 if (ident) {
@@ -440,13 +439,11 @@ const Parser = struct {
         const state = self.core.saveState();
         errdefer self.core.restoreState(state);
 
-        const data = self.inon.context.getEx(token.text);
-        if (data.is(.nulled)) {
-            try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
-            return error.ParsingFailed;
-        }
+        if (self.inon.context.getEx(token.text)) |data|
+            return data.copy(self.inon.allocator);
 
-        return data.copy(self.inon.allocator);
+        try self.emitError("undeclared identifier '{s}' referenced", .{token.text});
+        return error.ParsingFailed;
     }
 
     fn acceptAtomString(self: *Self) ParseError!Data {
@@ -508,13 +505,14 @@ const Parser = struct {
                             return error.ParsingFailed;
                         }
 
-                        const data = self.inon.context.getEx(sub_name);
+                        if (self.inon.context.getEx(sub_name)) |data| {
+                            const writer = str.value.str.writer(str.allocator);
 
-                        const writer = str.value.str.writer(str.allocator);
-                        try data.serialize(0, writer, .{
-                            .quote_string = false,
-                            .write_newlines = false,
-                        });
+                            try data.serialize(0, writer, .{
+                                .quote_string = false,
+                                .write_newlines = false,
+                            });
+                        }
 
                         i += pos;
                     } else {
@@ -625,7 +623,7 @@ const Parser = struct {
 
         var args = Data{ .value = .{ .array = .{} }, .allocator = self.inon.allocator };
         defer args.deinit();
-        var func = self.inon.context.get(fn_name);
+        var func = self.inon.context.get(fn_name) orelse Data.null_data;
 
         if (func.is(.nulled)) {
             try self.emitError("function '{s}' has not been defined", .{fn_name});
@@ -716,7 +714,7 @@ const Parser = struct {
             },
             else => |e| return e,
         };
-        const ret = try val.get("return").copy(self.inon.allocator);
+        const ret = try (val.get("return") orelse Data.null_data).copy(self.inon.allocator);
         return ret;
     }
 
